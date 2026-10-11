@@ -1,0 +1,23 @@
+server:
+  port: 8081
+
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!
+
+spring:
+  application:
+    name: bookmall-user
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmall_user
+    username: bookmall_user_app
+    password: bookmall_user_dev
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto

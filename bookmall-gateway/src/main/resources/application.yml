@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!
+
+spring:
+  application:
+    name: bookmall-gateway
+  cloud:
+    gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:5173"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        - id: users
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/users/**
+        - id: catalog
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/categories,/api/books/**
+        - id: orders
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/cart/**,/api/orders/**
+        - id: notifications
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/notifications/**

@@ -1,0 +1,19 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: bookmall-catalog
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmall_book
+    username: bookmall_book_app
+    password: bookmall_book_dev
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto

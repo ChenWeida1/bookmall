@@ -1,0 +1,35 @@
+---
+description: 纸间书店代码评审清单。评审 diff、检查合并前改动、或用户要求代码评审时使用。
+alwaysApply: true
+---
+
+# 代码评审
+
+对照 `docs/接口文档.md` 与 `docs/需求规格说明书.md` 审第一版范围。只报会到达运行时的缺陷，不改风格偏好。
+
+## 必须拦住
+
+- 浏览器请求绕过网关，直连 8081–8084，或网关新增 `/internal/**` 路由。
+- 购物车、订单、通知、`/api/users/me` 只在网关校验 JWT，服务自身可被直连后免登录访问；或查询、修改了其他用户的数据。
+- 新接口不用 `ApiResponse`：成功必须 `code = 0`、`message = ok`。可预期失败抛 `BusinessException`，不要在控制器里手写另一套错误 JSON。未预期异常对外只能是 `50000` /「服务器内部错误」，不能带堆栈或 SQL。
+- 下单未扣库存、扣库存与写订单不在同一业务结果里、或用消息队列发通知。第一版通知是订单服务同步 `POST /internal/notifications`。
+- 写入第一版范围外能力：支付、退款、物流、地址、优惠、评价、后台、取消订单、全部已读。
+- 密码、JWT secret 写入日志、响应体或前端除 `localStorage` 的 `bookmall.token` 以外的位置。接口密钥保持服务端配置，不进前端包。
+
+## 对照写法
+
+```java
+// 失败：控制器返回裸 Map，调用方无法按 code 判断
+return Map.of("success", false);
+
+// 通过：沿用统一包络
+throw new BusinessException(40901, 409, "库存不足");
+```
+
+```javascript
+// 失败：页面自己请求图书服务
+fetch('http://localhost:8082/api/books')
+
+// 通过：只走 api()，基址是网关
+const books = await api('/api/books')
+```

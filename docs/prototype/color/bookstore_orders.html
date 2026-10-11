@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>我的订单 · 纸间书店</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.js"></script>
+<style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body class="m-0 bg-[#f7f5ef] text-[#1c1c1c] min-h-screen">
+<header class="bg-[#17452c] text-white">
+<div class="max-w-[1200px] mx-auto px-6 h-16 flex items-center">
+<a class="text-[22px] font-bold tracking-[0.08em]" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/home.html?render_html=true">纸间书店</a>
+<nav class="ml-14 flex items-center gap-9 text-[15px]">
+<a class="pb-1 border-b-2 border-transparent hover:border-white/60" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/shop.html?render_html=true">书城</a>
+<a class="pb-1 border-b-2 border-transparent hover:border-white/60" data-guest-href="login-required.html?next=cart.html" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/cart.html?render_html=true">购物车</a>
+<a class="pb-1 border-b-2 border-white font-semibold" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/orders.html?render_html=true">我的订单</a>
+<a class="relative pb-1 border-b-2 border-transparent hover:border-white/60" data-guest-href="login-required.html?next=notifications.html" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/notifications.html?render_html=true">
+          消息
+          <span class="absolute -top-1 -right-3 w-2 h-2 rounded-full bg-[#e23b2e]" id="navDot"></span>
+</a>
+</nav>
+<div class="ml-auto flex items-center gap-3">
+<div class="flex items-center gap-3" id="authGuest">
+<a class="px-5 py-1.5 rounded border border-white/70 text-[15px] hover:bg-white/10" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/login.html?render_html=true">登录</a>
+<a class="px-5 py-1.5 rounded border border-white/70 text-[15px] hover:bg-white/10" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/register.html?render_html=true">注册</a>
+</div>
+<div class="items-center gap-3" id="authUser" style="display:none">
+<span class="text-[15px] text-white/90" id="userName">纸间读者</span>
+<span class="text-white/40">|</span>
+<button class="px-4 py-1.5 rounded border border-white/70 text-[15px] hover:bg-white/10" onclick="logout()">退出</button>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-[1200px] mx-auto px-6 pt-8 pb-12">
+<h1 class="text-[32px] font-bold text-[#12291c]">我的订单</h1>
+<p class="mt-3 text-[14px] text-black/55">仅显示当前用户订单，按创建时间倒序。</p>
+<div class="mt-6 rounded-sm border border-black/15 bg-white overflow-hidden">
+<table class="w-full border-collapse text-[15px]">
+<thead>
+<tr class="bg-white">
+<th class="text-left px-5 py-4 font-semibold border-b border-black/10">订单号</th>
+<th class="text-left px-5 py-4 font-semibold border-b border-black/10 w-[150px]">总金额</th>
+<th class="text-left px-5 py-4 font-semibold border-b border-black/10 w-[150px]">状态</th>
+<th class="text-left px-5 py-4 font-semibold border-b border-black/10 w-[200px]">创建时间</th>
+<th class="text-left px-5 py-4 font-semibold border-b border-black/10 w-[130px]">商品件数</th>
+<th class="text-left px-5 py-4 font-semibold border-b border-black/10 w-[130px]">操作</th>
+</tr>
+</thead>
+<tbody id="orderRows"></tbody>
+</table>
+</div>
+<div class="mt-6 rounded-sm border border-dashed border-black/20 bg-white py-16 text-center" id="ordersEmpty" style="display:none">
+<iconify-icon class="text-[40px] text-black/25" icon="mdi:receipt-text-outline"></iconify-icon>
+<p class="mt-3 text-[16px] text-black/70">还没有订单</p>
+<p class="mt-1 text-[13px] text-black/45">选好图书后提交订单，订单会出现在这里。</p>
+<a class="mt-5 inline-flex items-center justify-center h-11 px-6 rounded bg-[#17452c] text-white text-[15px] hover:bg-[#123823]" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/shop.html?render_html=true">前往书城</a>
+</div>
+<p class="mt-5 text-[14px] text-black/55">状态 <span class="mx-1 px-2 py-1 rounded bg-[#17452c] text-white text-[13px]">CREATED</span> 表示已创建，第一版无需支付。</p>
+</main>
+<footer class="max-w-[1200px] mx-auto px-6 py-8 text-[13px] text-black/45">
+<a class="text-[#17452c] underline underline-offset-2" href="https://modao.cc/agent-py/workspace/6ac8ff115e06803032b8fe35/bookstore.html/home.html?render_html=true">← 返回原型总览</a>
+<span class="ml-3">纸间书店原型 · 我的订单</span>
+</footer>
+<script>
+    var USER_KEY = 'zj_user';
+    var ORDERS_KEY = 'zj_orders';
+
+    function getUser() {
+      try { return localStorage.getItem(USER_KEY); } catch (e) { return null; }
+    }
+
+    function logout() {
+      try { localStorage.removeItem(USER_KEY); } catch (e) {}
+      window.location.href = 'home.html';
+    }
+
+    function applyAuth() {
+      var user = getUser();
+      var guestBox = document.getElementById('authGuest');
+      var userBox = document.getElementById('authUser');
+      var nameEl = document.getElementById('userName');
+      if (user) {
+        guestBox.style.display = 'none';
+        userBox.style.display = 'flex';
+        if (nameEl) { nameEl.textContent = user; }
+      } else {
+        guestBox.style.display = 'flex';
+        userBox.style.display = 'none';
+        var gated = document.querySelectorAll('[data-guest-href]');
+        for (var i = 0; i < gated.length; i++) {
+          gated[i].setAttribute('href', gated[i].getAttribute('data-guest-href'));
+        }
+      }
+    }
+
+    function applyNotifyDot() {
+      var dot = document.getElementById('navDot');
+      if (!dot) { return; }
+      var unread = 1;
+      try {
+        var raw = localStorage.getItem('zj_notifications');
+        if (raw) {
+          unread = 0;
+          var list = JSON.parse(raw);
+          for (var i = 0; i < list.length; i++) { if (!list[i].read) { unread++; } }
+        }
+      } catch (e) { unread = 1; }
+      dot.style.display = unread > 0 ? 'block' : 'none';
+    }
+
+    function seedOrders() {
+      return [
+        {
+          id: '20261009120000A8K2',
+          total: 218.60,
+          status: 'CREATED',
+          createdAt: '2026-10-09 12:00',
+          count: 3,
+          items: [
+            { name: '围城', price: 39.80, qty: 2 },
+            { name: '计算机系统', price: 139.00, qty: 1 }
+          ]
+        },
+        {
+          id: '20261008101522B3M9',
+          total: 68.00,
+          status: 'CREATED',
+          createdAt: '2026-10-08 10:15',
+          count: 1,
+          items: [
+            { name: '三体', price: 68.00, qty: 1 }
+          ]
+        }
+      ];
+    }
+
+    function readOrders() {
+      var orders = null;
+      try {
+        var raw = localStorage.getItem(ORDERS_KEY);
+        if (raw) { orders = JSON.parse(raw); }
+      } catch (e) { orders = null; }
+      if (!orders || !orders.length) {
+        orders = seedOrders();
+        try { localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); } catch (e) {}
+      }
+      return orders;
+    }
+
+    function cell(text, className) {
+      var td = document.createElement('td');
+      td.className = className || 'px-5 py-5 border-b border-black/10 align-middle';
+      td.textContent = text;
+      return td;
+    }
+
+    function render() {
+      var orders = readOrders();
+      var tbody = document.getElementById('orderRows');
+      tbody.innerHTML = '';
+
+      for (var i = 0; i < orders.length; i++) {
+        var order = orders[i];
+        var tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#fbfaf6]';
+
+        tr.appendChild(cell(order.id));
+
+        var amount = cell('¥' + order.total.toFixed(2), 'px-5 py-5 border-b border-black/10 text-[#c0392b] font-medium');
+        tr.appendChild(amount);
+
+        var statusTd = document.createElement('td');
+        statusTd.className = 'px-5 py-5 border-b border-black/10';
+        var badge = document.createElement('span');
+        badge.className = 'inline-block px-3 py-1 rounded bg-[#17452c] text-white text-[13px]';
+        badge.textContent = order.status || 'CREATED';
+        statusTd.appendChild(badge);
+        tr.appendChild(statusTd);
+
+        tr.appendChild(cell(order.createdAt));
+        tr.appendChild(cell(String(order.count)));
+
+        var actionTd = document.createElement('td');
+        actionTd.className = 'px-5 py-5 border-b border-black/10';
+        var link = document.createElement('a');
+        link.href = 'order-detail.html?id=' + encodeURIComponent(order.id);
+        link.className = 'text-[#17452c] underline underline-offset-4 hover:text-[#123823]';
+        link.textContent = '查看详情';
+        actionTd.appendChild(link);
+        tr.appendChild(actionTd);
+
+        tbody.appendChild(tr);
+      }
+
+      var isEmpty = orders.length === 0;
+      document.getElementById('orderRows').parentNode.parentNode.style.display = isEmpty ? 'none' : 'block';
+      document.getElementById('ordersEmpty').style.display = isEmpty ? 'block' : 'none';
+    }
+
+    applyAuth();
+    applyNotifyDot();
+    render();
+  </script>
+</body>
+</html>

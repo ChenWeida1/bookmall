@@ -1,0 +1,12 @@
+---
+description: 页面验证使用本机 Chrome 窗口，不用 Cursor 内置浏览器。
+alwaysApply: true
+---
+
+# 浏览器验证
+
+改了页面、样式、路由或前端数据后，用 Playwright MCP 在外部 Chrome 里验证。不要用 Cursor 内置浏览器（Browser Tab、cursor-ide-browser）。
+
+- 打开可见的本机 Google Chrome 窗口，不要用 headless。
+- 按真实用户操作：打开页面、点击、输入、提交，再确认结果。
+- 验证结束就关掉这次打开的页面。
