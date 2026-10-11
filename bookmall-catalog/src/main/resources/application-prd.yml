@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/bookmall_book
+    username: bookmall_book_app
+    password: ${BOOKMALL_BOOK_DB_PASSWORD}

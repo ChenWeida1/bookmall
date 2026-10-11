@@ -1,19 +1,12 @@
 server:
   port: 8083
 
-bookmall:
-  jwt:
-    secret: bookmall-dev-jwt-secret-key-32b!
-  catalog-base-url: http://localhost:8082
-  notification-base-url: http://localhost:8084
-
 spring:
+  profiles:
+    default: dev
   application:
     name: bookmall-order
   datasource:
-    url: jdbc:postgresql://localhost:5432/bookmall_order
-    username: bookmall_order_app
-    password: bookmall_order_dev
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
 

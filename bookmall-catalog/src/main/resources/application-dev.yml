@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmall_book
+    username: bookmall_book_app
+    password: bookmall_book_dev

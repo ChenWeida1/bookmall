@@ -1,0 +1,11 @@
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+  catalog-base-url: http://127.0.0.1:8082
+  notification-base-url: http://127.0.0.1:8084
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/bookmall_order
+    username: bookmall_order_app
+    password: ${BOOKMALL_ORDER_DB_PASSWORD}

@@ -1,0 +1,11 @@
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://8.134.124.218"

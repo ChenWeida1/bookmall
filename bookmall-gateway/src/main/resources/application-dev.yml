@@ -1,0 +1,11 @@
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!
+
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:5173"

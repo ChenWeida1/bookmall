@@ -1,11 +1,9 @@
 server:
   port: 8080
 
-bookmall:
-  jwt:
-    secret: bookmall-dev-jwt-secret-key-32b!
-
 spring:
+  profiles:
+    default: dev
   application:
     name: bookmall-gateway
   cloud:
@@ -14,7 +12,6 @@ spring:
         add-to-simple-url-handler-mapping: true
         cors-configurations:
           '[/**]':
-            allowedOrigins: "http://localhost:5173"
             allowedMethods: "*"
             allowedHeaders: "*"
             allowCredentials: true

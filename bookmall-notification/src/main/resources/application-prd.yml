@@ -1,0 +1,9 @@
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/bookmall_notification
+    username: bookmall_notification_app
+    password: ${BOOKMALL_NOTIFICATION_DB_PASSWORD}
