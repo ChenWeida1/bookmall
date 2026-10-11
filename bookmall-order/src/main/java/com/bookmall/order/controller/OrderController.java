@@ -122,6 +122,14 @@ public class OrderController {
         return ApiResponse.ok(orderService.detail(JwtAuthFilter.userId(request), parseId(id, "订单不存在")));
     }
 
+    /**
+     * 取消本人已创建订单。成功后状态为 CANCELLED，库存已按明细加回。
+     */
+    @PostMapping("/api/orders/{id}/cancel")
+    public ApiResponse<Map<String, Object>> cancel(HttpServletRequest request, @PathVariable String id) {
+        return ApiResponse.ok(orderService.cancel(JwtAuthFilter.userId(request), parseId(id, "订单不存在")));
+    }
+
     /** 路径主键必须是正整数，否则按资源不存在处理。 */
     private static long parseId(String raw, String message) {
         try {

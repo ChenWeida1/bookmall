@@ -12,8 +12,8 @@ import java.util.Date;
 /**
  * 签发和校验登录令牌。
  * <p>
- * 使用 HMAC-SHA 签名。主题（subject）存用户编号，自定义声明 {@code username} 存登录名。
- * 网关和各业务服务必须使用同一密钥，否则互相签发的令牌无法通过校验。
+ * 使用 HMAC-SHA 签名。主题（subject）存用户编号，自定义声明 {@code username}、{@code role}。
+ * 网关和各业务服务必须使用同一密钥。
  */
 public class JwtService {
 
@@ -21,8 +21,6 @@ public class JwtService {
     private final SecretKey key;
 
     /**
-     * 用配置密钥初始化签名器。密钥长度需满足 HMAC-SHA 的要求。
-     *
      * @param secret {@code bookmall.jwt.secret}
      */
     public JwtService(String secret) {
@@ -30,18 +28,19 @@ public class JwtService {
     }
 
     /**
-     * 签发一张在指定时刻过期的令牌。
+     * 签发令牌。
      *
-     * @param userId    用户主键，写入 subject
+     * @param userId    用户主键
      * @param username  登录名
+     * @param role      1 读者 / 2 管理员
      * @param expiresAt 过期时间
-     * @return 紧凑格式的 JWT 字符串
      */
-    public String create(long userId, String username, Instant expiresAt) {
+    public String create(long userId, String username, short role, Instant expiresAt) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(Long.toString(userId))
                 .claim("username", username)
+                .claim("role", (int) role)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(key)
@@ -49,11 +48,7 @@ public class JwtService {
     }
 
     /**
-     * 校验签名、过期时间并还原用户信息。
-     *
-     * @param token 不含 {@code Bearer } 前缀的令牌
-     * @return 令牌中的用户
-     * @throws io.jsonwebtoken.JwtException 签名无效、已过期或格式错误
+     * 校验并还原用户。旧令牌若无 role 声明，按读者处理。
      */
     public JwtUser parse(String token) {
         Claims claims = Jwts.parser()
@@ -61,6 +56,8 @@ public class JwtService {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return new JwtUser(Long.parseLong(claims.getSubject()), claims.get("username", String.class));
+        Number roleNum = claims.get("role", Number.class);
+        short role = roleNum == null ? JwtUser.ROLE_READER : roleNum.shortValue();
+        return new JwtUser(Long.parseLong(claims.getSubject()), claims.get("username", String.class), role);
     }
 }

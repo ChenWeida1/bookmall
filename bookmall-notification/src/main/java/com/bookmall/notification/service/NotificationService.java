@@ -9,6 +9,7 @@ import com.bookmall.common.error.BusinessException;
 import com.bookmall.common.web.PageQuery;
 import com.bookmall.common.web.Texts;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +17,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 通知的查询、标为已读和内部创建。
+ * 通知的查询、标为已读和创建（含 MQ 消费与内部补发）。
  * <p>
- * 用户侧列表不返回 userId。内部创建接口的响应会多带 userId，方便订单服务核对写入结果。
- * 标题最长 64，正文最长 255，空白内容按参数不合法处理。
+ * 用户侧列表不返回 userId。带 {@code bizKey} 时按唯一约束幂等：重复写入视为成功。
  */
 @Service
 @RequiredArgsConstructor
@@ -30,11 +30,6 @@ public class NotificationService {
 
     /**
      * 分页查询当前用户的通知，新的在前。
-     *
-     * @param userId 当前用户
-     * @param page   页码，缺省 1
-     * @param size   每页条数，缺省 10
-     * @return 通知分页，read 为布尔值
      */
     public PageResult<Map<String, Object>> list(long userId, Integer page, Integer size) {
         PageQuery query = PageQuery.of(page, size);
@@ -48,10 +43,6 @@ public class NotificationService {
 
     /**
      * 把一条通知标为已读。重复标记仍返回成功后的内容。
-     *
-     * @param userId 当前用户
-     * @param id     通知主键
-     * @return 更新后的通知，read 为 true
      */
     @Transactional
     public Map<String, Object> markRead(long userId, long id) {
@@ -67,26 +58,54 @@ public class NotificationService {
     }
 
     /**
-     * 由订单服务创建一条未读通知。
-     *
-     * @param userId  收件用户，必须为正数
-     * @param title   标题
-     * @param content 正文
-     * @return 新建通知，额外包含 userId
+     * 内部 HTTP 补发：无 bizKey。
      */
     @Transactional
     public Map<String, Object> create(Long userId, String title, String content) {
+        return create(userId, title, content, null);
+    }
+
+    /**
+     * 创建未读通知。若提供 bizKey 且已存在，直接返回已有记录（幂等）。
+     */
+    @Transactional
+    public Map<String, Object> create(Long userId, String title, String content, String bizKey) {
         if (userId == null || userId <= 0) {
             throw BusinessException.badRequest("参数不合法");
         }
         String safeTitle = trimRequired(title, 64);
         String safeContent = trimRequired(content, 255);
+        String safeBizKey = trimBizKey(bizKey);
+        if (safeBizKey != null) {
+            Notification existing = notifications.selectOne(Wrappers.<Notification>lambdaQuery()
+                    .eq(Notification::getBizKey, safeBizKey));
+            if (existing != null) {
+                Map<String, Object> body = view(existing);
+                body.put("userId", existing.getUserId());
+                return body;
+            }
+        }
         Notification notification = new Notification();
         notification.setUserId(userId);
         notification.setTitle(safeTitle);
         notification.setContent(safeContent);
         notification.setReadFlag((short) 0);
-        notifications.insert(notification);
+        notification.setBizKey(safeBizKey);
+        try {
+            notifications.insert(notification);
+        } catch (DuplicateKeyException ex) {
+            // 并发重复投递：再查一次已有行。
+            if (safeBizKey != null) {
+                Notification existing = notifications.selectOne(Wrappers.<Notification>lambdaQuery()
+                        .eq(Notification::getBizKey, safeBizKey));
+                if (existing != null) {
+                    Map<String, Object> body = view(existing);
+                    body.put("userId", existing.getUserId());
+                    return body;
+                }
+            }
+            throw ex;
+        }
         Map<String, Object> body = view(notification);
         body.put("userId", notification.getUserId());
         return body;
@@ -101,6 +120,17 @@ public class NotificationService {
         row.put("read", notification.getReadFlag() != null && notification.getReadFlag() == 1);
         row.put("createdAt", Texts.time(notification.getCreatedAt()));
         return row;
+    }
+
+    private static String trimBizKey(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String value = raw.trim();
+        if (value.length() > 64) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return value;
     }
 
     /** 去掉首尾空白，并拒绝空串和超长文本。 */

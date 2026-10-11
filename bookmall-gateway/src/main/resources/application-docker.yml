@@ -1,0 +1,40 @@
+# Compose：网关把各 /api 路径转到容器服务名，禁止暴露 /internal。
+server:
+  port: 8080
+
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        - id: users
+          uri: ${BOOKMALL_USER_URI:http://user:8081}
+          predicates:
+            - Path=/api/users/**
+        - id: catalog
+          uri: ${BOOKMALL_CATALOG_URI:http://catalog:8082}
+          predicates:
+            - Path=/api/categories,/api/books/**
+        - id: catalog-admin
+          uri: ${BOOKMALL_CATALOG_URI:http://catalog:8082}
+          predicates:
+            - Path=/api/admin/**
+        - id: orders
+          uri: ${BOOKMALL_ORDER_URI:http://order:8083}
+          predicates:
+            - Path=/api/cart/**,/api/orders/**
+        - id: notifications
+          uri: ${BOOKMALL_NOTIFICATION_URI:http://notification:8084}
+          predicates:
+            - Path=/api/notifications/**

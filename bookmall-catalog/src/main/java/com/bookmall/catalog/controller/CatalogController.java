@@ -3,10 +3,13 @@ package com.bookmall.catalog.controller;
 import com.bookmall.catalog.service.CatalogService;
 import com.bookmall.common.api.ApiResponse;
 import com.bookmall.common.api.PageResult;
+import com.bookmall.common.auth.JwtAuthFilter;
 import com.bookmall.common.error.BusinessException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +21,8 @@ import java.util.Map;
 /**
  * 图书目录接口。
  * <p>
- * {@code /api} 给前端查询分类和图书。{@code /internal} 只给订单服务扣减和回补库存，
- * 网关会拦截外部对 {@code /internal} 的访问。
+ * {@code /api} 给前端查询分类和图书；{@code /api/admin} 给管理员改上下架。
+ * {@code /internal} 只给订单服务扣减和回补库存，网关会拦截外部访问。
  */
 @RestController
 @RequiredArgsConstructor
@@ -68,6 +71,27 @@ public class CatalogController {
     }
 
     /**
+     * 管理员修改上架状态，可选覆盖库存。必须 JWT 角色为管理员。
+     */
+    @PutMapping("/api/admin/books/{id}")
+    public ApiResponse<Map<String, Object>> adminUpdate(
+            HttpServletRequest request,
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        JwtAuthFilter.requireAdmin(request);
+        Map<String, Object> json = body == null ? Map.of() : body;
+        Object status = json.get("status");
+        Object stock = json.get("stock");
+        if (status == null && stock == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return ApiResponse.ok(catalogService.adminUpdate(
+                parseId(id),
+                status == null ? null : String.valueOf(status),
+                stock == null ? null : intValue(stock)));
+    }
+
+    /**
      * 扣减库存，由订单服务在下单时调用。
      *
      * @param id   图书主键
@@ -91,6 +115,16 @@ public class CatalogController {
     public ApiResponse<Void> restore(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
         Map<String, Object> json = body == null ? Map.of() : body;
         catalogService.restore(parseId(id), intValue(json.get("quantity")), text(json.get("token")));
+        return ApiResponse.ok(null);
+    }
+
+    /**
+     * 按数量还库存（订单取消），不依赖扣减令牌。
+     */
+    @PostMapping("/internal/books/{id}/stock/restore-qty")
+    public ApiResponse<Void> restoreQty(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
+        Map<String, Object> json = body == null ? Map.of() : body;
+        catalogService.restoreQuantity(parseId(id), intValue(json.get("quantity")));
         return ApiResponse.ok(null);
     }
 

@@ -1,0 +1,19 @@
+# Compose：连容器内 Postgres 与 Redis。
+server:
+  port: 8082
+
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
+spring:
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'

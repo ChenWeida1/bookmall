@@ -63,11 +63,20 @@ public class NotificationController {
      * @param body 含 userId、title、content
      * @return 新建通知
      */
+    /**
+     * 内部创建/补发通知。可选 bizKey 用于幂等。
+     * 主路径已改为 MQ 消费；本接口保留给运维补发。
+     */
     @PostMapping("/internal/notifications")
     public ApiResponse<Map<String, Object>> create(@RequestBody(required = false) Map<String, Object> body) {
         Map<String, Object> json = body == null ? Map.of() : body;
         Long userId = longValue(json.get("userId"));
-        return ApiResponse.ok(notificationService.create(userId, text(json.get("title")), text(json.get("content"))));
+        String bizKey = text(json.get("bizKey"));
+        if (bizKey == null) {
+            bizKey = text(json.get("biz_key"));
+        }
+        return ApiResponse.ok(notificationService.create(
+                userId, text(json.get("title")), text(json.get("content")), bizKey));
     }
 
     /** 路径主键必须是正整数。 */

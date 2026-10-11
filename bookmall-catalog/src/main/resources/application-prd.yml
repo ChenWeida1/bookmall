@@ -1,4 +1,12 @@
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
 spring:
+  data:
+    redis:
+      host: ${BOOKMALL_REDIS_HOST:127.0.0.1}
+      port: ${BOOKMALL_REDIS_PORT:6379}
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/bookmall_book
     username: bookmall_book_app

@@ -9,6 +9,8 @@ import Cart from './views/Cart.vue'
 import Orders from './views/Orders.vue'
 import OrderDetail from './views/OrderDetail.vue'
 import Notifications from './views/Notifications.vue'
+import AdminBooks from './views/AdminBooks.vue'
+import { isAdmin } from './api'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -21,13 +23,18 @@ const router = createRouter({
     { path: '/cart', component: Cart, meta: { auth: true } },
     { path: '/orders', component: Orders, meta: { auth: true } },
     { path: '/orders/:id', component: OrderDetail, meta: { auth: true } },
-    { path: '/notifications', component: Notifications, meta: { auth: true } }
+    { path: '/notifications', component: Notifications, meta: { auth: true } },
+    // 管理端：需登录且 role=ADMIN
+    { path: '/admin/books', component: AdminBooks, meta: { auth: true, admin: true } }
   ]
 })
 
 router.beforeEach((to) => {
   if (to.meta.auth && !currentUser()) {
     return { path: '/login-required', query: { next: to.fullPath } }
+  }
+  if (to.meta.admin && !isAdmin()) {
+    return { path: '/' }
   }
   return true
 })

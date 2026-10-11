@@ -1,0 +1,22 @@
+# Compose：订单服务经服务名访问目录，经 RabbitMQ 发通知。
+server:
+  port: 8083
+
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+  catalog-base-url: ${BOOKMALL_CATALOG_BASE_URL}
+  notification-base-url: ${BOOKMALL_NOTIFICATION_BASE_URL}
+
+spring:
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'

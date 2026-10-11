@@ -8,6 +8,7 @@
           <router-link to="/cart">购物车</router-link>
           <router-link to="/orders">我的订单</router-link>
           <router-link to="/notifications">消息</router-link>
+          <router-link v-if="admin" to="/admin/books">管理</router-link>
         </nav>
         <div class="spacer">
           <template v-if="user">
@@ -28,10 +29,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { clearSession, session } from './api'
+import { clearSession, isAdmin, session } from './api'
 
 const router = useRouter()
 const user = computed(() => session.user)
+const admin = computed(() => isAdmin())
 
 function logout() {
   clearSession()

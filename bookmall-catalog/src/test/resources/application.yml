@@ -1,0 +1,15 @@
+# 图书集成测试：Redis 不可用时 BookCache 会降级读库。
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!
+
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 200ms
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmall_book
+    username: bookmall_book_app
+    password: bookmall_book_dev

@@ -1,0 +1,165 @@
+# 纸间书店第二版：依赖与后端一键启动。
+# 用途：本地联调 Postgres / Redis / RabbitMQ + 五服务 + 前端静态资源（可选）。
+# 与一期差异：增加 Redis:6379、RabbitMQ:5672/15672；通知走 MQ。
+#
+# 用法（仓库根目录）：
+#   docker compose up -d postgres redis rabbitmq
+#   # 初始化库见 README / docs/数据库设置.md（含 07-phase2-*.sql）
+#   docker compose up -d --build
+#
+# 网关对外 http://localhost:8080 ，前端开发仍可用 npm run dev（5173）。
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: bookmall-postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - bookmall-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 图书列表/分类短 TTL 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: bookmall-redis
+    ports:
+      - "6379:6379"
+
+  # 订单通知交换机 bookmall.notification
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: bookmall-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  user:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.service
+      args:
+        MODULE: bookmall-user
+    container_name: bookmall-user
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_user
+      SPRING_DATASOURCE_USERNAME: bookmall_user_app
+      SPRING_DATASOURCE_PASSWORD: bookmall_user_dev
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  catalog:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.service
+      args:
+        MODULE: bookmall-catalog
+    container_name: bookmall-catalog
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_book
+      SPRING_DATASOURCE_USERNAME: bookmall_book_app
+      SPRING_DATASOURCE_PASSWORD: bookmall_book_dev
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  order:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.service
+      args:
+        MODULE: bookmall-order
+    container_name: bookmall-order
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_order
+      SPRING_DATASOURCE_USERNAME: bookmall_order_app
+      SPRING_DATASOURCE_PASSWORD: bookmall_order_dev
+      BOOKMALL_CATALOG_BASE_URL: http://catalog:8082
+      BOOKMALL_NOTIFICATION_BASE_URL: http://notification:8084
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      catalog:
+        condition: service_started
+
+  notification:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.service
+      args:
+        MODULE: bookmall-notification
+    container_name: bookmall-notification
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_notification
+      SPRING_DATASOURCE_USERNAME: bookmall_notification_app
+      SPRING_DATASOURCE_PASSWORD: bookmall_notification_dev
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.service
+      args:
+        MODULE: bookmall-gateway
+    container_name: bookmall-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      BOOKMALL_USER_URI: http://user:8081
+      BOOKMALL_CATALOG_URI: http://catalog:8082
+      BOOKMALL_ORDER_URI: http://order:8083
+      BOOKMALL_NOTIFICATION_URI: http://notification:8084
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user
+      - catalog
+      - order
+      - notification
+
+volumes:
+  bookmall-pg:

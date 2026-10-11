@@ -68,7 +68,13 @@ export function formatTime(value) {
 
 export function statusLabel(status) {
   if (status === 'CREATED') return '已创建'
+  if (status === 'CANCELLED') return '已取消'
   if (status === 'ON_SALE') return '在售'
   if (status === 'OFF_SALE') return '下架'
   return status
+}
+
+/** 当前登录用户是否管理员（登录响应 user.role === 'ADMIN'）。 */
+export function isAdmin() {
+  return session.user && session.user.role === 'ADMIN'
 }

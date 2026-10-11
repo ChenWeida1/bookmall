@@ -1,10 +1,15 @@
 bookmall:
   jwt:
     secret: ${BOOKMALL_JWT_SECRET}
-  catalog-base-url: http://127.0.0.1:8082
-  notification-base-url: http://127.0.0.1:8084
+  catalog-base-url: ${BOOKMALL_CATALOG_BASE_URL:http://127.0.0.1:8082}
+  notification-base-url: ${BOOKMALL_NOTIFICATION_BASE_URL:http://127.0.0.1:8084}
 
 spring:
+  rabbitmq:
+    host: ${BOOKMALL_RABBITMQ_HOST:127.0.0.1}
+    port: ${BOOKMALL_RABBITMQ_PORT:5672}
+    username: ${BOOKMALL_RABBITMQ_USER:guest}
+    password: ${BOOKMALL_RABBITMQ_PASSWORD:guest}
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/bookmall_order
     username: bookmall_order_app

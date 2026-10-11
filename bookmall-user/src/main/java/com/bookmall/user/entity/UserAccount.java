@@ -34,7 +34,19 @@ public class UserAccount {
     /** 展示用昵称，缺省与用户名相同。 */
     private String nickname;
 
+    /**
+     * 角色：1 读者，2 管理员。
+     * 新注册默认读者；种子管理员为 2。
+     */
+    private Short role;
+
     /** 注册时间，UTC。插入时自动填充。 */
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;
+
+    /** 读者角色常量。 */
+    public static final short ROLE_READER = 1;
+
+    /** 管理员角色常量。 */
+    public static final short ROLE_ADMIN = 2;
 }

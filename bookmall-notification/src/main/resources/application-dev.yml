@@ -3,6 +3,11 @@ bookmall:
     secret: bookmall-dev-jwt-secret-key-32b!
 
 spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
   datasource:
     url: jdbc:postgresql://localhost:5432/bookmall_notification
     username: bookmall_notification_app

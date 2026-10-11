@@ -1,8 +1,9 @@
 <template>
   <main class="page">
     <h1>我的订单</h1>
-    <p class="muted">仅显示当前用户订单，按创建时间倒序。</p>
+    <p class="muted">仅显示当前用户订单，按创建时间倒序。已创建订单可取消。</p>
     <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="message" class="muted">{{ message }}</p>
     <p v-if="!ready" class="muted">加载中</p>
     <p v-else-if="!orders.length && !error" class="muted">还没有订单</p>
     <table v-else>
@@ -16,11 +17,19 @@
           <td><span class="badge">{{ statusLabel(order.status) }}</span></td>
           <td>{{ formatTime(order.createdAt) }}</td>
           <td>{{ order.itemCount }}</td>
-          <td><router-link :to="`/orders/${order.id}`">查看详情</router-link></td>
+          <td>
+            <router-link :to="`/orders/${order.id}`">查看详情</router-link>
+            <button
+              v-if="order.status === 'CREATED'"
+              class="ghost"
+              style="margin-left: 8px"
+              :disabled="busyId === order.id"
+              @click="cancel(order)"
+            >取消</button>
+          </td>
         </tr>
       </tbody>
     </table>
-    <p class="muted">状态「已创建」表示订单已创建，第一版无需支付。</p>
   </main>
 </template>
 
@@ -30,16 +39,37 @@ import { api, formatTime, statusLabel } from '../api'
 
 const orders = ref([])
 const error = ref('')
+const message = ref('')
 const ready = ref(false)
+const busyId = ref(null)
+
+async function load() {
+  const data = await api('/api/orders')
+  orders.value = data.items
+}
 
 onMounted(async () => {
   try {
-    const data = await api('/api/orders')
-    orders.value = data.items
+    await load()
   } catch (ex) {
     error.value = ex.message
   } finally {
     ready.value = true
   }
 })
+
+async function cancel(order) {
+  error.value = ''
+  message.value = ''
+  busyId.value = order.id
+  try {
+    await api('/api/orders/' + order.id + '/cancel', { method: 'POST' })
+    message.value = '订单已取消'
+    await load()
+  } catch (ex) {
+    error.value = ex.message
+  } finally {
+    busyId.value = null
+  }
+}
 </script>

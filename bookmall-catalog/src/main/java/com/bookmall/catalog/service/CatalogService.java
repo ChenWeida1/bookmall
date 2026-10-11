@@ -39,12 +39,19 @@ public class CatalogService {
     /** 扣减令牌。 */
     private final StockChangeMapper changes;
 
+    /** 分类与图书列表缓存。 */
+    private final BookCache cache;
+
     /**
-     * 列出全部分类，按主键升序。
+     * 列出全部分类，按主键升序。结果缓存 60 秒。
      *
      * @return 每项含 id、name
      */
     public List<Map<String, Object>> listCategories() {
+        return cache.getOrLoad(BookCache.KEY_CATEGORIES, this::loadCategories);
+    }
+
+    private List<Map<String, Object>> loadCategories() {
         return categories.selectList(Wrappers.<Category>lambdaQuery().orderByAsc(Category::getId)).stream().map(category -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", category.getId());
@@ -54,7 +61,7 @@ public class CatalogService {
     }
 
     /**
-     * 分页查询在售图书。分类不存在时返回空页。
+     * 分页查询在售图书。分类不存在时返回空页。列表结果按页条件缓存。
      *
      * @param page       页码，缺省 1
      * @param size       每页条数，缺省 10，最大 50
@@ -65,6 +72,11 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public PageResult<Map<String, Object>> listBooks(Integer page, Integer size, Long categoryId, String keyword) {
         PageQuery query = PageQuery.of(page, size);
+        String key = BookCache.booksKey(query.page(), query.size(), categoryId, keyword);
+        return cache.getOrLoad(key, () -> loadBooks(query, categoryId, keyword));
+    }
+
+    private PageResult<Map<String, Object>> loadBooks(PageQuery query, Long categoryId, String keyword) {
         if (categoryId != null && categories.selectById(categoryId) == null) {
             return new PageResult<>(query.page(), query.size(), 0, List.of());
         }
@@ -126,6 +138,7 @@ public class CatalogService {
         if (updated == 0) {
             throw shortage(id, qty);
         }
+        cache.evictBooks();
         return stockView(id);
     }
 
@@ -161,6 +174,64 @@ public class CatalogService {
         if (changes.markRestored(safeToken) != 1) {
             throw new BusinessException(500, 50000, "服务器内部错误");
         }
+        // 库存变了，列表缓存里的 stock 可能过期，直接清掉。
+        cache.evictBooks();
+    }
+
+    /**
+     * 订单取消时按数量加回库存，不依赖下单时的扣减令牌。
+     * <p>
+     * 与带 token 的 restore 分开，避免取消路径误改 stock_change 表。
+     */
+    @Transactional
+    public void restoreQuantity(long id, Integer quantity) {
+        int qty = requirePositive(quantity);
+        if (id <= 0 || books.selectById(id) == null) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        if (books.restore(id, qty) != 1) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        cache.evictBooks();
+    }
+
+    /**
+     * 管理员修改上架状态，可选覆盖库存。
+     * status 仅接受 ON_SALE / OFF_SALE（或 1 / 0）。
+     */
+    @Transactional
+    public Map<String, Object> adminUpdate(long id, String statusName, Integer stock) {
+        if (id <= 0) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        Book book = books.selectById(id);
+        if (book == null) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        if (statusName != null && !statusName.isBlank()) {
+            short status = parseStatus(statusName);
+            books.updateStatus(id, status);
+        }
+        if (stock != null) {
+            if (stock < 0) {
+                throw BusinessException.badRequest("参数不合法");
+            }
+            books.updateStock(id, stock);
+        }
+        cache.evictBooks();
+        return detail(id);
+    }
+
+    /** 接受 ON_SALE/OFF_SALE 或 1/0。 */
+    private static short parseStatus(String raw) {
+        String value = raw.trim();
+        if ("ON_SALE".equalsIgnoreCase(value) || "1".equals(value)) {
+            return Book.ON_SALE;
+        }
+        if ("OFF_SALE".equalsIgnoreCase(value) || "0".equals(value)) {
+            return Book.OFF_SALE;
+        }
+        throw BusinessException.badRequest("参数不合法");
     }
 
     /** 列表和详情共用的图书摘要，金额格式化为两位小数。 */

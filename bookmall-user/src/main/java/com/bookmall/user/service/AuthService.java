@@ -59,6 +59,8 @@ public class AuthService {
         account.setUsername(username);
         account.setPassword(passwordEncoder.encode(password));
         account.setNickname(nickname);
+        // 公开注册只能成为读者，管理员靠种子或运维改库。
+        account.setRole(UserAccount.ROLE_READER);
         try {
             users.insert(account);
         } catch (DataIntegrityViolationException ex) {
@@ -103,19 +105,22 @@ public class AuthService {
     private Map<String, Object> tokenResponse(UserAccount account) {
         Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS).truncatedTo(ChronoUnit.SECONDS);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("token", jwtService.create(account.getId(), account.getUsername(), expiresAt));
+        short role = account.getRole() == null ? UserAccount.ROLE_READER : account.getRole();
+        body.put("token", jwtService.create(account.getId(), account.getUsername(), role, expiresAt));
         body.put("tokenType", "Bearer");
         body.put("expiresAt", Texts.time(expiresAt.atOffset(java.time.ZoneOffset.UTC)));
         body.put("user", userView(account));
         return body;
     }
 
-    /** 对外返回的用户摘要，不包含密码哈希。 */
+    /** 对外返回的用户摘要，不包含密码哈希；role 为 READER / ADMIN。 */
     private Map<String, Object> userView(UserAccount account) {
         Map<String, Object> user = new LinkedHashMap<>();
         user.put("id", account.getId());
         user.put("username", account.getUsername());
         user.put("nickname", account.getNickname());
+        short role = account.getRole() == null ? UserAccount.ROLE_READER : account.getRole();
+        user.put("role", role == UserAccount.ROLE_ADMIN ? "ADMIN" : "READER");
         return user;
     }
 

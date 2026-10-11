@@ -87,4 +87,13 @@ public class BusinessException extends RuntimeException {
     public static BusinessException notFound(String message) {
         return new BusinessException(404, 40400, message);
     }
+
+    /**
+     * 已登录但无权限，错误码 40300。
+     *
+     * @param message 说明原因，例如「需要管理员权限」
+     */
+    public static BusinessException forbidden(String message) {
+        return new BusinessException(403, 40300, message);
+    }
 }

@@ -5,6 +5,11 @@ bookmall:
   notification-base-url: http://localhost:8084
 
 spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
   datasource:
     url: jdbc:postgresql://localhost:5432/bookmall_order
     username: bookmall_order_app

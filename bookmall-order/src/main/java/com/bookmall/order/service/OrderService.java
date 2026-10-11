@@ -3,7 +3,7 @@ package com.bookmall.order.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bookmall.order.client.CatalogClient;
-import com.bookmall.order.client.NotificationClient;
+import com.bookmall.order.client.NotificationPublisher;
 import com.bookmall.order.entity.CartItem;
 import com.bookmall.order.entity.OrderItem;
 import com.bookmall.order.entity.OrderMain;
@@ -40,7 +40,7 @@ import java.util.UUID;
  * <p>
  * 第一版只结算当前用户的全部购物车，不支持勾选部分商品。同一用户的下单会串行执行。
  * 扣库存前先提交占用令牌；写订单失败或进程中断时，按同一令牌把库存加回。
- * 订单落库成功后再同步发通知，通知失败不影响订单。
+ * 订单落库成功后再投递 MQ 通知，投递失败不影响订单。
  */
 @Service
 @RequiredArgsConstructor
@@ -66,8 +66,8 @@ public class OrderService {
     /** 目录服务，用于查书和扣库存。 */
     private final CatalogClient catalog;
 
-    /** 通知服务。 */
-    private final NotificationClient notifications;
+    /** 经 RabbitMQ 投递站内信。 */
+    private final NotificationPublisher notifications;
 
     /** 在同一事务里写订单并清空购物车。 */
     private final OrderWriter writer;
@@ -166,10 +166,56 @@ public class OrderService {
             compensate(userId, attempted, ex);
             throw ex;
         }
-        notifications.create(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
+        notifications.orderCreated(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
         return detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
                 .eq(OrderItem::getOrderId, order.getId())
                 .orderByAsc(OrderItem::getId)));
+    }
+
+    /**
+     * 取消本人的已创建订单：先改状态再还库存，最后投递取消通知。
+     * <p>
+     * 故意不加类级大事务包住 HTTP 还库存：状态更新各自提交，还库存失败时把状态改回 CREATED，
+     * 避免「库已 CANCELLED 但库存未还」或事务回滚导致库存已还、订单仍 CREATED。
+     * 他人订单或不存在统一 404，避免探测。
+     */
+    public Map<String, Object> cancel(long userId, long orderId) {
+        OrderMain order = orders.selectOne(Wrappers.<OrderMain>lambdaQuery()
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId));
+        if (order == null) {
+            throw BusinessException.notFound("订单不存在");
+        }
+        if (order.getStatus() == null || order.getStatus() != OrderMain.CREATED) {
+            throw new BusinessException(400, 40008, "订单状态不允许取消");
+        }
+        // 先占住 CANCELLED，避免并发双重还库存；还库存失败则改回 CREATED。
+        int updated = orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
+                .set(OrderMain::getStatus, OrderMain.CANCELLED)
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId)
+                .eq(OrderMain::getStatus, OrderMain.CREATED));
+        if (updated != 1) {
+            throw new BusinessException(400, 40008, "订单状态不允许取消");
+        }
+        List<OrderItem> orderItems = items.selectList(Wrappers.<OrderItem>lambdaQuery()
+                .eq(OrderItem::getOrderId, orderId)
+                .orderByAsc(OrderItem::getId));
+        try {
+            for (OrderItem item : orderItems) {
+                catalog.restoreQuantity(item.getBookId(), item.getQuantity());
+            }
+        } catch (RuntimeException ex) {
+            orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
+                    .set(OrderMain::getStatus, OrderMain.CREATED)
+                    .eq(OrderMain::getId, orderId)
+                    .eq(OrderMain::getStatus, OrderMain.CANCELLED));
+            log.error("取消订单还库存失败，已回滚状态 orderId={}", orderId, ex);
+            throw new BusinessException(500, 50000, "服务器内部错误");
+        }
+        order.setStatus(OrderMain.CANCELLED);
+        notifications.orderCancelled(userId, order.getOrderNo());
+        return detailView(order, orderItems);
     }
 
     /**
@@ -315,13 +361,14 @@ public class OrderService {
         return row;
     }
 
-    /** 列表和详情共用的订单头。第一版状态对外固定为 CREATED。 */
+    /** 列表和详情共用的订单头。数字状态映射为 CREATED / CANCELLED。 */
     private Map<String, Object> header(OrderMain order) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", order.getId());
         row.put("orderNo", order.getOrderNo());
         row.put("totalAmount", Texts.money(order.getTotalAmount()));
-        row.put("status", "CREATED");
+        short status = order.getStatus() == null ? OrderMain.CREATED : order.getStatus();
+        row.put("status", status == OrderMain.CANCELLED ? "CANCELLED" : "CREATED");
         row.put("createdAt", Texts.time(order.getCreatedAt()));
         return row;
     }

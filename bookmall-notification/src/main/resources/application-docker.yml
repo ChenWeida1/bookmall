@@ -1,0 +1,20 @@
+# Compose：通知服务消费 RabbitMQ 并写库。
+server:
+  port: 8084
+
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
+spring:
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'

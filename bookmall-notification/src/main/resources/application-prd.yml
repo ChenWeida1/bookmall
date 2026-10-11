@@ -3,6 +3,11 @@ bookmall:
     secret: ${BOOKMALL_JWT_SECRET}
 
 spring:
+  rabbitmq:
+    host: ${BOOKMALL_RABBITMQ_HOST:127.0.0.1}
+    port: ${BOOKMALL_RABBITMQ_PORT:5672}
+    username: ${BOOKMALL_RABBITMQ_USER:guest}
+    password: ${BOOKMALL_RABBITMQ_PASSWORD:guest}
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/bookmall_notification
     username: bookmall_notification_app

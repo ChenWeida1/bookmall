@@ -37,6 +37,12 @@ public class Notification {
     /** 已读标记：0 未读，1 已读。 */
     private Short readFlag;
 
+    /**
+     * 业务幂等键，例如 ORDER_CREATED:订单号。
+     * 唯一索引保证重复投递只落一条。
+     */
+    private String bizKey;
+
     /** 创建时间，UTC。插入时自动填充。 */
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;

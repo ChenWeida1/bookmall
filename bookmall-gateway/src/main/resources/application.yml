@@ -24,6 +24,10 @@ spring:
           uri: http://localhost:8082
           predicates:
             - Path=/api/categories,/api/books/**
+        - id: catalog-admin
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/admin/**
         - id: orders
           uri: http://localhost:8083
           predicates:

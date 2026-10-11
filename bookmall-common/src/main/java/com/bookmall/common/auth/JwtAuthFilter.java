@@ -1,6 +1,7 @@
 package com.bookmall.common.auth;
 
 import com.bookmall.common.api.ApiResponse;
+import com.bookmall.common.error.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -30,6 +31,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     /** 请求属性名：当前登录名。 */
     public static final String USERNAME = "bookmall.username";
 
+    /** 请求属性名：角色数字，1 读者 / 2 管理员。 */
+    public static final String ROLE = "bookmall.role";
+
     /** 令牌校验器。 */
     private final JwtService jwtService;
 
@@ -58,6 +62,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             JwtUser user = jwtService.parse(header.substring(7).trim());
             request.setAttribute(USER_ID, user.userId());
             request.setAttribute(USERNAME, user.username());
+            request.setAttribute(ROLE, user.role());
             chain.doFilter(request, response);
         } catch (JwtException | IllegalArgumentException ex) {
             writeUnauthorized(response);
@@ -85,5 +90,30 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return id;
         }
         throw new IllegalStateException("缺少登录用户");
+    }
+
+    /**
+     * 读取当前角色。
+     *
+     * @throws IllegalStateException 过滤器未写入角色
+     */
+    public static short role(HttpServletRequest request) {
+        Object value = request.getAttribute(ROLE);
+        if (value instanceof Short role) {
+            return role;
+        }
+        if (value instanceof Number number) {
+            return number.shortValue();
+        }
+        throw new IllegalStateException("缺少登录角色");
+    }
+
+    /**
+     * 要求当前用户为管理员，否则抛出 40300。
+     */
+    public static void requireAdmin(HttpServletRequest request) {
+        if (role(request) != JwtUser.ROLE_ADMIN) {
+            throw BusinessException.forbidden("需要管理员权限");
+        }
     }
 }

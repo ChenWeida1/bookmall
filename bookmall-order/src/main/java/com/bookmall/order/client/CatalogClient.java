@@ -118,6 +118,22 @@ public class CatalogClient {
     }
 
     /**
+     * 订单取消时按数量还库存，不带扣减令牌。
+     */
+    public void restoreQuantity(long bookId, int quantity) {
+        JsonNode body = exchange("POST", "/internal/books/" + bookId + "/stock/restore-qty",
+                objectMapper.createObjectNode().put("quantity", quantity));
+        int code = body.path("code").asInt(-1);
+        if (code == 0) {
+            return;
+        }
+        if (code == 40400) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        throw new BusinessException(500, 50000, "服务器内部错误");
+    }
+
+    /**
      * 发起一次 HTTP 调用并解析 JSON。HTTP 4xx/5xx 若带响应体，仍按业务响应解析。
      */
     private JsonNode exchange(String method, String path, JsonNode json) {

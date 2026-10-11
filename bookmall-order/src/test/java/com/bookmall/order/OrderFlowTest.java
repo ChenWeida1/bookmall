@@ -2,7 +2,7 @@ package com.bookmall.order;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.bookmall.order.client.CatalogClient;
-import com.bookmall.order.client.NotificationClient;
+import com.bookmall.order.client.NotificationPublisher;
 import com.bookmall.order.entity.CartItem;
 import com.bookmall.order.mapper.CartItemMapper;
 import com.bookmall.order.service.CartService;
@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -29,10 +30,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 下单主流程测试。目录和通知用假客户端，避免依赖另外两个服务。
+ * 下单主流程测试。目录和通知用假客户端，避免依赖另外两个服务与 MQ。
  * 事务回滚会清掉用例里写入的购物车和订单。
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @Transactional
 class OrderFlowTest {
 
@@ -51,7 +53,7 @@ class OrderFlowTest {
     CatalogClient catalog;
 
     @MockBean
-    NotificationClient notifications;
+    NotificationPublisher notifications;
 
     /** 空购物车不能下单，错误码 40005。 */
     @Test
@@ -70,7 +72,7 @@ class OrderFlowTest {
         verify(catalog, never()).deduct(anyLong(), anyInt(), anyString());
     }
 
-    /** 下单成功后购物车被清空，并按合计金额发送通知。两本 39.80 合计 79.60。 */
+    /** 下单成功后购物车被清空，并投递下单成功通知。两本 39.80 合计 79.60。 */
     @Test
     void successClearsCartAndNotifies() {
         saveCart(910003L, 1L, 2);
@@ -78,7 +80,7 @@ class OrderFlowTest {
         var created = orders.create(910003L, null);
         assertEquals("CREATED", created.get("status"));
         assertTrue(carts.selectList(Wrappers.<CartItem>lambdaQuery().eq(CartItem::getUserId, 910003L)).isEmpty());
-        verify(notifications).create(eq(910003L), anyString(), eq("79.60"));
+        verify(notifications).orderCreated(eq(910003L), anyString(), eq("79.60"));
     }
 
     /** 第二本书扣减失败时，已经扣掉的第一本书要被回补。 */

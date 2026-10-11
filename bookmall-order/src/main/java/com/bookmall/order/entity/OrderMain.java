@@ -22,8 +22,11 @@ import java.time.OffsetDateTime;
 @TableName("order_main")
 public class OrderMain {
 
-    /** 已创建。第一版下单成功后即为此状态。 */
+    /** 已创建。下单成功后即为此状态。 */
     public static final short CREATED = 1;
+
+    /** 已取消。仅可由 CREATED 转入。 */
+    public static final short CANCELLED = 2;
 
     /** 主键，数据库自增。 */
     @TableId(type = IdType.AUTO)
@@ -38,7 +41,7 @@ public class OrderMain {
     /** 订单合计，单位元。 */
     private BigDecimal totalAmount;
 
-    /** 订单状态，第一版固定为 {@link #CREATED}。 */
+    /** 订单状态：{@link #CREATED} 或 {@link #CANCELLED}。 */
     private Short status;
 
     /** 下单时间，UTC。插入时自动填充。 */

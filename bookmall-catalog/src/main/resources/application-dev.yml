@@ -1,4 +1,12 @@
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!
+
 spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
   datasource:
     url: jdbc:postgresql://localhost:5432/bookmall_book
     username: bookmall_book_app

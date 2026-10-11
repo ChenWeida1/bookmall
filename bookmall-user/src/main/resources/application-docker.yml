@@ -1,0 +1,15 @@
+# Compose / 容器内配置：数据源与密钥由环境变量注入。
+server:
+  port: 8081
+
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'

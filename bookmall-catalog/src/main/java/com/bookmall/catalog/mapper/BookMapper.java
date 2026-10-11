@@ -56,4 +56,20 @@ public interface BookMapper extends BaseMapper<Book> {
      */
     @Update("UPDATE book SET stock = stock + #{quantity} WHERE id = #{id}")
     int restore(@Param("id") long id, @Param("quantity") int quantity);
+
+    /**
+     * 管理端改上下架状态。
+     *
+     * @param id     图书主键
+     * @param status 1 在售 / 0 下架
+     * @return 更新行数
+     */
+    @Update("UPDATE book SET status = #{status} WHERE id = #{id}")
+    int updateStatus(@Param("id") long id, @Param("status") short status);
+
+    /**
+     * 管理端直接改库存（覆盖写）。
+     */
+    @Update("UPDATE book SET stock = #{stock} WHERE id = #{id} AND #{stock} >= 0")
+    int updateStock(@Param("id") long id, @Param("stock") int stock);
 }
