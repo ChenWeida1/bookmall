@@ -8,4 +8,4 @@ spring:
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOrigins: "http://8.134.124.218"
+            allowedOrigins: "http://8.148.193.237"
