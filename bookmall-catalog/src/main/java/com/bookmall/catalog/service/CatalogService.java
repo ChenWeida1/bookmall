@@ -15,6 +15,8 @@ import com.bookmall.common.web.Texts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -138,7 +140,7 @@ public class CatalogService {
         if (updated == 0) {
             throw shortage(id, qty);
         }
-        cache.evictBooks();
+        evictBooksAfterChange();
         return stockView(id);
     }
 
@@ -174,8 +176,7 @@ public class CatalogService {
         if (changes.markRestored(safeToken) != 1) {
             throw new BusinessException(500, 50000, "服务器内部错误");
         }
-        // 库存变了，列表缓存里的 stock 可能过期，直接清掉。
-        cache.evictBooks();
+        evictBooksAfterChange();
     }
 
     /**
@@ -192,7 +193,7 @@ public class CatalogService {
         if (books.restore(id, qty) != 1) {
             throw BusinessException.notFound("图书不存在");
         }
-        cache.evictBooks();
+        evictBooksAfterChange();
     }
 
     /**
@@ -208,18 +209,46 @@ public class CatalogService {
         if (book == null) {
             throw BusinessException.notFound("图书不存在");
         }
-        if (statusName != null && !statusName.isBlank()) {
-            short status = parseStatus(statusName);
-            books.updateStatus(id, status);
+        boolean statusProvided = statusName != null;
+        if (!statusProvided && stock == null) {
+            throw BusinessException.badRequest("参数不合法");
         }
-        if (stock != null) {
-            if (stock < 0) {
+        Short status = null;
+        if (statusProvided) {
+            if (statusName.isBlank()) {
                 throw BusinessException.badRequest("参数不合法");
             }
-            books.updateStock(id, stock);
+            status = parseStatus(statusName);
         }
-        cache.evictBooks();
+        if (stock != null && stock < 0) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        if (status != null) {
+            books.updateStatus(id, status);
+        }
+        if (stock != null && books.updateStock(id, stock) != 1) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        evictBooksAfterChange();
         return detail(id);
+    }
+
+    /**
+     * 库存或上下架变了就清列表缓存。
+     * <p>
+     * 事务还没提交时，别的请求可能读到旧库存并写回缓存。提交成功后再清一次，避免这 60 秒内列表仍显示旧库存。
+     */
+    private void evictBooksAfterChange() {
+        cache.evictBooks();
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                cache.evictBooks();
+            }
+        });
     }
 
     /** 接受 ON_SALE/OFF_SALE 或 1/0。 */

@@ -1,0 +1,14 @@
+# 通知接口测试不连接 RabbitMQ。
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmall_notification
+    username: bookmall_notification_app
+    password: bookmall_notification_dev
+
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!

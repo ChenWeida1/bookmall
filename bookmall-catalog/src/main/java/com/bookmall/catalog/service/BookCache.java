@@ -1,5 +1,6 @@
 package com.bookmall.catalog.service;
 
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -16,6 +17,7 @@ import java.util.function.Supplier;
  * Redis 不可用时降级读库，不向外抛 500。
  */
 @Component
+@RequiredArgsConstructor
 public class BookCache {
 
     private static final Logger log = LoggerFactory.getLogger(BookCache.class);
@@ -30,10 +32,6 @@ public class BookCache {
     private static final Duration TTL = Duration.ofSeconds(60);
 
     private final RedisTemplate<String, Object> redis;
-
-    public BookCache(RedisTemplate<String, Object> redis) {
-        this.redis = redis;
-    }
 
     /**
      * 读缓存，未命中则执行 loader 并回写；Redis 异常则直接 loader。

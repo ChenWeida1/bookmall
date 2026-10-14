@@ -18,6 +18,10 @@ public class CheckoutLock {
 
     /**
      * 锁住该用户，直到调用方所在的事务结束。
+     * <p>
+     * {@code pg_advisory_xact_lock} 是 PostgreSQL 内置函数（不是业务存储过程），
+     * 也不锁任何表或行；它按传入的 {@code userId} 拿事务级咨询锁（advisory lock），
+     * 仅用于应用层串行化同一用户的下单，事务提交或回滚时自动释放。
      *
      * @param userId 下单用户
      */

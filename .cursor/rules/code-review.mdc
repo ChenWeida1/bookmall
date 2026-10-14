@@ -1,11 +1,11 @@
 ---
-description: 纸间书店代码评审清单。评审 diff、检查合并前改动、或用户要求代码评审时使用。
+description: 纸间书店代码评审清单。评审 diff、检查合并前改动、或用户要求代码评审时使用。评审里改过的行为要用对应用例跑通。
 alwaysApply: true
 ---
 
 # 代码评审
 
-对照 `docs/接口文档.md` 与 `docs/需求规格说明书.md` 审当前版本范围。只报会到达运行时的缺陷，不改风格偏好。
+对照 `docs/接口文档.md` 与 `docs/需求规格说明书.md` 审当前版本范围。只报会到达运行时的缺陷，不改风格偏好。依赖已是 `final`、构造器只做赋值时除外：改为 `@RequiredArgsConstructor`。
 
 ## 必须拦住
 
@@ -16,6 +16,16 @@ alwaysApply: true
 - 写入当前版本文档未约定的能力：真实支付、退款、物流、地址、优惠、评价、全部已读等。
 - 密码、JWT secret 写入日志、响应体或前端除 `localStorage` 的 `bookmall.token` 以外的位置。接口密钥保持服务端配置，不进前端包。
 - 管理端接口未校验管理员角色，或普通读者可改图书上下架。
+
+## 改完要测
+
+评审里改过的行为，用对应用例跑通后再结束。现有测试盖不住这次改动时，补上再跑。没测过的修复不算完成。
+
+```text
+失败：改了取消订单时的库存回滚，没有用例就结束
+
+通过：补上「还库存中途失败要扣回」的用例，并跑通所在模块的测试
+```
 
 ## 对照写法
 
@@ -33,4 +43,21 @@ fetch('http://localhost:8082/api/books')
 
 // 通过：只走 api()，基址是网关
 const books = await api('/api/books')
+```
+
+```java
+// 失败：字段已是 final，仍手写只赋值的构造器
+public class OrderService {
+    private final OrderMapper orderMapper;
+
+    public OrderService(OrderMapper orderMapper) {
+        this.orderMapper = orderMapper;
+    }
+}
+
+// 通过：改用 Lombok 生成构造器
+@RequiredArgsConstructor
+public class OrderService {
+    private final OrderMapper orderMapper;
+}
 ```

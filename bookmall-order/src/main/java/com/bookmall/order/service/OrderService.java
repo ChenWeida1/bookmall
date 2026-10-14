@@ -99,19 +99,170 @@ public class OrderService {
         if (body != null && body.has("itemIds")) {
             throw BusinessException.badRequest("第一版仅支持结算全部购物车");
         }
+        // 同一用户串行下单，避免连点读到同一份购物车、扣两次库存。
         checkoutLock.lock(userId);
         if (TransactionAspectSupport.currentTransactionStatus().isNewTransaction()) {
+            // 上次进程在扣库存和写订单之间停掉时，stock_hold 里还留着令牌。先按原令牌把库存加回。
             recoverHolds(userId);
         }
+        List<Line> lines = loadCheckoutLines(userId);
+
+        // 每一本书一个新令牌。图书服务用它保证同一笔只扣一次、只补一次。
+        List<Hold> pending = new ArrayList<>();
+        for (Line line : lines) {
+            pending.add(new Hold(line.book().bookId(), line.item().getQuantity(), UUID.randomUUID().toString()));
+        }
+        // 先单独提交占用。后面扣库存的 HTTP 成功后进程若退出，订单库仍能找到这些令牌。
+        persistHolds(userId, pending);
+        List<Hold> attempted = new ArrayList<>();
+        OrderMain order;
+        try {
+            for (int i = 0; i < pending.size(); i++) {
+                Hold hold = pending.get(i);
+                attempted.add(hold);
+                try {
+                    catalog.deduct(hold.bookId(), hold.quantity(), hold.token());
+                } catch (BusinessException ex) {
+                    // 校验之后库存仍可能被别人买走。对外仍按整单库存不足返回，并带上 data.items。
+                    if (ex.getCode() != 40006) {
+                        throw ex;
+                    }
+                    throw shortage(lines.get(i), ex.getData());
+                }
+            }
+            BigDecimal total = lines.stream()
+                    .map(line -> Texts.times(line.book().price(), line.item().getQuantity()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            order = writer.save(userId, nextOrderNo(), total, lines);
+            // 订单已写下，占用完成，删掉令牌。库存保持已扣状态。
+            holds.delete(Wrappers.<StockHold>lambdaQuery().eq(StockHold::getUserId, userId));
+        } catch (RuntimeException ex) {
+            // 写订单失败：用同一令牌回补。令牌已回补过的不会再次加库存。
+            compensate(userId, attempted, ex);
+            throw ex;
+        }
+        // 通知失败只记日志，不回滚已经成功的订单。
+        notifications.orderCreated(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
+        return detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
+                .eq(OrderItem::getOrderId, order.getId())
+                .orderByAsc(OrderItem::getId)));
+    }
+
+    /**
+     * 取消本人的已创建订单：先改状态再还库存，最后投递取消通知。
+     * <p>
+     * 故意不加类级大事务包住 HTTP 还库存：先把状态改成 CANCELLED，再按明细加库存。
+     * 中途失败时，已加回的数量用扣减接口扣回去，扣回成功才改回 CREATED。
+     * 扣不回去就保持 CANCELLED，避免再次取消把同一批库存再加一次。
+     * 他人订单或不存在统一 404，避免探测。
+     */
+    public Map<String, Object> cancel(long userId, long orderId) {
+        OrderMain order = orders.selectOne(Wrappers.<OrderMain>lambdaQuery()
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId));
+        if (order == null) {
+            throw BusinessException.notFound("订单不存在");
+        }
+        if (order.getStatus() == null || order.getStatus() != OrderMain.CREATED) {
+            throw new BusinessException(400, 40008, "订单状态不允许取消");
+        }
+        // 先占住 CANCELLED，避免两个取消请求一起还库存。
+        int updated = orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
+                .set(OrderMain::getStatus, OrderMain.CANCELLED)
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId)
+                .eq(OrderMain::getStatus, OrderMain.CREATED));
+        if (updated != 1) {
+            throw new BusinessException(400, 40008, "订单状态不允许取消");
+        }
+        List<OrderItem> orderItems = items.selectList(Wrappers.<OrderItem>lambdaQuery()
+                .eq(OrderItem::getOrderId, orderId)
+                .orderByAsc(OrderItem::getId));
+        List<OrderItem> restored = new ArrayList<>();
+        try {
+            for (OrderItem item : orderItems) {
+                catalog.restoreQuantity(item.getBookId(), item.getQuantity());
+                restored.add(item);
+            }
+        } catch (RuntimeException ex) {
+            // 前面几本已经加回。先按同样数量扣回，扣回成功才改回 CREATED。
+            // 扣不回去就保持 CANCELLED，避免用户再次取消把库存再加一遍。
+            log.error("取消订单还库存失败 orderId={} userId={}", orderId, userId, ex);
+            if (undoCancelRestores(orderId, restored)) {
+                orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
+                        .set(OrderMain::getStatus, OrderMain.CREATED)
+                        .eq(OrderMain::getId, orderId)
+                        .eq(OrderMain::getUserId, userId)
+                        .eq(OrderMain::getStatus, OrderMain.CANCELLED));
+            } else {
+                log.error("取消订单已还库存未能扣回，保持取消状态以免重复加库存 orderId={} userId={}", orderId, userId);
+            }
+            throw new BusinessException(500, 50000, "服务器内部错误");
+        }
+        order.setStatus(OrderMain.CANCELLED);
+        notifications.orderCancelled(userId, order.getOrderNo());
+        return detailView(order, orderItems);
+    }
+
+    /**
+     * 把这次取消已经加回的库存再扣回去。
+     *
+     * @return 每一本都扣回去了
+     */
+    private boolean undoCancelRestores(long orderId, List<OrderItem> restored) {
+        boolean ok = true;
+        for (int i = restored.size() - 1; i >= 0; i--) {
+            OrderItem item = restored.get(i);
+            // 这是回滚用的新令牌，不是下单时的占用令牌。长度必须落在扣减接口的 1–64。
+            String token = "cancel-undo-" + UUID.randomUUID().toString().replace("-", "");
+            try {
+                catalog.deduct(item.getBookId(), item.getQuantity(), token);
+            } catch (RuntimeException ex) {
+                ok = false;
+                log.error("取消订单回滚库存失败 orderId={} bookId={} quantity={}",
+                        orderId, item.getBookId(), item.getQuantity(), ex);
+            }
+        }
+        return ok;
+    }
+
+    /** 扣减阶段发现库存不足时，仍按创建订单接口的 data.items 结构返回。 */
+    private static BusinessException shortage(Line line, Object data) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("bookId", line.book().bookId());
+        row.put("bookTitle", line.book().title());
+        row.put("stock", stockOf(data, line.book().stock()));
+        row.put("quantity", line.item().getQuantity());
+        return new BusinessException(400, 40006, "库存不足", Map.of("items", List.of(row)));
+    }
+
+    /** 目录服务若带回了扣减时的库存，用那个数；否则退回下单前看到的库存。 */
+    private static int stockOf(Object data, int fallback) {
+        if (data instanceof JsonNode node && node.path("stock").canConvertToInt()) {
+            return node.path("stock").asInt();
+        }
+        if (data instanceof Map<?, ?> map && map.get("stock") instanceof Number number) {
+            return number.intValue();
+        }
+        return fallback;
+    }
+
+    /**
+     * 读取当前用户的购物车，并按固定顺序核对每一行。
+     * 购物车为空、图书不存在、未上架、库存不足都在这里抛出，调用方拿到的就是可以扣库存的明细。
+     */
+    private List<Line> loadCheckoutLines(long userId) {
         List<CartItem> cart = carts.selectList(Wrappers.<CartItem>lambdaQuery()
                 .eq(CartItem::getUserId, userId)
                 .orderByAsc(CartItem::getId));
         if (cart.isEmpty()) {
             throw new BusinessException(400, 40005, "购物车为空");
         }
+        // 购物车只存 bookId，书名、价格、库存以图书服务此刻的快照为准。
         List<Line> lines = cart.stream()
                 .map(item -> new Line(item, catalog.getBook(item.getBookId())))
                 .toList();
+        // 缺书、下架、库存不足都整单失败，并带上是哪些书。
         List<Map<String, Object>> missing = lines.stream()
                 .filter(line -> !line.book().exists())
                 .map(line -> Map.<String, Object>of("bookId", line.book().bookId()))
@@ -144,78 +295,7 @@ public class OrderService {
         if (!shortStock.isEmpty()) {
             throw new BusinessException(400, 40006, "库存不足", Map.of("items", shortStock));
         }
-
-        List<Hold> pending = new ArrayList<>();
-        for (Line line : lines) {
-            pending.add(new Hold(line.book().bookId(), line.item().getQuantity(), UUID.randomUUID().toString()));
-        }
-        persistHolds(userId, pending);
-        List<Hold> attempted = new ArrayList<>();
-        OrderMain order;
-        try {
-            for (Hold hold : pending) {
-                attempted.add(hold);
-                catalog.deduct(hold.bookId(), hold.quantity(), hold.token());
-            }
-            BigDecimal total = lines.stream()
-                    .map(line -> Texts.times(line.book().price(), line.item().getQuantity()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            order = writer.save(userId, nextOrderNo(), total, lines);
-            holds.delete(Wrappers.<StockHold>lambdaQuery().eq(StockHold::getUserId, userId));
-        } catch (RuntimeException ex) {
-            compensate(userId, attempted, ex);
-            throw ex;
-        }
-        notifications.orderCreated(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
-        return detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
-                .eq(OrderItem::getOrderId, order.getId())
-                .orderByAsc(OrderItem::getId)));
-    }
-
-    /**
-     * 取消本人的已创建订单：先改状态再还库存，最后投递取消通知。
-     * <p>
-     * 故意不加类级大事务包住 HTTP 还库存：状态更新各自提交，还库存失败时把状态改回 CREATED，
-     * 避免「库已 CANCELLED 但库存未还」或事务回滚导致库存已还、订单仍 CREATED。
-     * 他人订单或不存在统一 404，避免探测。
-     */
-    public Map<String, Object> cancel(long userId, long orderId) {
-        OrderMain order = orders.selectOne(Wrappers.<OrderMain>lambdaQuery()
-                .eq(OrderMain::getId, orderId)
-                .eq(OrderMain::getUserId, userId));
-        if (order == null) {
-            throw BusinessException.notFound("订单不存在");
-        }
-        if (order.getStatus() == null || order.getStatus() != OrderMain.CREATED) {
-            throw new BusinessException(400, 40008, "订单状态不允许取消");
-        }
-        // 先占住 CANCELLED，避免并发双重还库存；还库存失败则改回 CREATED。
-        int updated = orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
-                .set(OrderMain::getStatus, OrderMain.CANCELLED)
-                .eq(OrderMain::getId, orderId)
-                .eq(OrderMain::getUserId, userId)
-                .eq(OrderMain::getStatus, OrderMain.CREATED));
-        if (updated != 1) {
-            throw new BusinessException(400, 40008, "订单状态不允许取消");
-        }
-        List<OrderItem> orderItems = items.selectList(Wrappers.<OrderItem>lambdaQuery()
-                .eq(OrderItem::getOrderId, orderId)
-                .orderByAsc(OrderItem::getId));
-        try {
-            for (OrderItem item : orderItems) {
-                catalog.restoreQuantity(item.getBookId(), item.getQuantity());
-            }
-        } catch (RuntimeException ex) {
-            orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
-                    .set(OrderMain::getStatus, OrderMain.CREATED)
-                    .eq(OrderMain::getId, orderId)
-                    .eq(OrderMain::getStatus, OrderMain.CANCELLED));
-            log.error("取消订单还库存失败，已回滚状态 orderId={}", orderId, ex);
-            throw new BusinessException(500, 50000, "服务器内部错误");
-        }
-        order.setStatus(OrderMain.CANCELLED);
-        notifications.orderCancelled(userId, order.getOrderNo());
-        return detailView(order, orderItems);
+        return lines;
     }
 
     /**

@@ -1,7 +1,9 @@
 package com.bookmall.notification.mq;
 
+import com.bookmall.common.error.BusinessException;
 import com.bookmall.common.mq.NotificationMessage;
 import com.bookmall.notification.service.NotificationService;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -13,15 +15,12 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("!test")
+@RequiredArgsConstructor
 public class NotificationConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationConsumer.class);
 
     private final NotificationService notifications;
-
-    public NotificationConsumer(NotificationService notifications) {
-        this.notifications = notifications;
-    }
 
     @RabbitListener(queues = NotificationMessage.QUEUE)
     public void onMessage(NotificationMessage message) {
@@ -30,8 +29,9 @@ public class NotificationConsumer {
         }
         try {
             notifications.create(message.getUserId(), message.getTitle(), message.getContent(), message.getBizKey());
-        } catch (RuntimeException ex) {
-            // 业务校验失败（如参数不合法）记日志并 ack，避免毒消息死循环。
+        } catch (BusinessException ex) {
+            // 参数不合法时记日志后正常返回，容器自动确认，避免毒消息反复入队。
+            // 数据库等瞬时失败继续抛出，由容器拒绝并重新投递。
             log.error("消费通知失败 userId={} bizKey={} reason={}",
                     message.getUserId(), message.getBizKey(), ex.toString());
         }

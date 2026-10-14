@@ -92,16 +92,23 @@ public class NotificationController {
         }
     }
 
-    /** 把 JSON 数字或数字字符串转成 Long；无法解析时返回 null，交给服务层报参数错误。 */
+    /** 把 JSON 数字或数字字符串转成 Long。小数截断会通知错用户，无法解析时返回 null，交给服务层报参数错误。 */
     private static Long longValue(Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
         if (value == null) {
             return null;
         }
+        if (value instanceof Integer || value instanceof Long) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (!Double.isFinite(raw) || raw != Math.floor(raw) || raw <= 0) {
+                return null;
+            }
+            return number.longValue();
+        }
         try {
-            return Long.valueOf(String.valueOf(value));
+            return Long.valueOf(String.valueOf(value).trim());
         } catch (NumberFormatException ex) {
             return null;
         }

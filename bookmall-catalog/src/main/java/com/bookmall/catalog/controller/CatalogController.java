@@ -88,7 +88,7 @@ public class CatalogController {
         return ApiResponse.ok(catalogService.adminUpdate(
                 parseId(id),
                 status == null ? null : String.valueOf(status),
-                stock == null ? null : intValue(stock)));
+                stock == null ? null : adminStock(stock)));
     }
 
     /**
@@ -146,18 +146,42 @@ public class CatalogController {
         return value == null ? null : String.valueOf(value);
     }
 
-    /** 把 JSON 数字或数字字符串转成整数；无法解析时按数量不合法处理。 */
+    /** 把 JSON 数字或数字字符串转成整数。小数和超出 int 范围按数量不合法处理，避免把 1.5 截成 1。 */
     private static Integer intValue(Object value) {
+        return wholeNumber(value, new BusinessException(400, 40007, "数量不合法"));
+    }
+
+    /** 管理端库存。非法数字按参数不合法，不使用扣库存的 40007。 */
+    private static Integer adminStock(Object value) {
+        return wholeNumber(value, BusinessException.badRequest("参数不合法"));
+    }
+
+    /** 只接受能落在 int 里的整数。{@code 2.0} 可以，{@code 1.5} 不行。 */
+    private static Integer wholeNumber(Object value, BusinessException invalid) {
         if (value == null) {
             return null;
         }
+        if (value instanceof Integer number) {
+            return number;
+        }
+        if (value instanceof Long number) {
+            if (number < Integer.MIN_VALUE || number > Integer.MAX_VALUE) {
+                throw invalid;
+            }
+            return number.intValue();
+        }
         if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (!Double.isFinite(raw) || raw != Math.floor(raw)
+                    || raw < Integer.MIN_VALUE || raw > Integer.MAX_VALUE) {
+                throw invalid;
+            }
             return number.intValue();
         }
         try {
-            return Integer.valueOf(String.valueOf(value));
+            return Integer.valueOf(String.valueOf(value).trim());
         } catch (NumberFormatException ex) {
-            throw new BusinessException(400, 40007, "数量不合法");
+            throw invalid;
         }
     }
 }
