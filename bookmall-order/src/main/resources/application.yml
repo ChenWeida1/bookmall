@@ -1,7 +1,21 @@
 server:
   port: 8083
 
+bookmall:
+  # 待支付超时。开发环境在 application-dev.yml 里改成 1 分钟。
+  pay-timeout: 15m
+
 spring:
+  rabbitmq:
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2.0
+          max-interval: 10000ms
   profiles:
     default: dev
   application:

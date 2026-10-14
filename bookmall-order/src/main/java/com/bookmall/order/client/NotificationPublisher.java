@@ -29,6 +29,14 @@ public class NotificationPublisher {
     }
 
     /**
+     * 模拟支付成功通知。不代表真实渠道扣款。
+     */
+    public void orderPaid(long userId, String orderNo, String totalAmount) {
+        String content = "您的订单 " + orderNo + " 已支付，合计 ¥" + totalAmount;
+        publish(userId, "订单已支付", content, "ORDER_PAID:" + orderNo, orderNo, totalAmount);
+    }
+
+    /**
      * 订单取消通知。
      */
     public void orderCancelled(long userId, String orderNo) {

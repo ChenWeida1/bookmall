@@ -11,7 +11,13 @@
       <p>总金额：<span class="price">¥{{ order.totalAmount }}</span></p>
       <p>商品件数：{{ order.itemCount }}</p>
       <button
-        v-if="order.status === 'CREATED'"
+        v-if="order.status === 'PENDING_PAY'"
+        class="solid"
+        :disabled="busy"
+        @click="pay"
+      >支付</button>
+      <button
+        v-if="order.status === 'PENDING_PAY'"
         :disabled="busy"
         @click="cancel"
       >取消订单</button>
@@ -49,6 +55,20 @@ onMounted(async () => {
     error.value = ex.message
   }
 })
+
+async function pay() {
+  error.value = ''
+  message.value = ''
+  busy.value = true
+  try {
+    order.value = await api('/api/orders/' + route.params.id + '/pay', { method: 'POST' })
+    message.value = '支付成功'
+  } catch (ex) {
+    error.value = ex.message
+  } finally {
+    busy.value = false
+  }
+}
 
 async function cancel() {
   error.value = ''

@@ -84,11 +84,11 @@ public class OrderController {
     }
 
     /**
-     * 用全部购物车创建订单。
+     * 创建订单。请求体可带 itemIds 做部分结算；省略则结算全部购物车。
      *
      * @param request 已登录请求
-     * @param body    可空；带 itemIds 会被拒绝
-     * @return 新订单详情
+     * @param body    可空；可含 itemIds
+     * @return 新订单详情，状态为待支付
      */
     @PostMapping("/api/orders")
     public ApiResponse<Map<String, Object>> create(HttpServletRequest request, @RequestBody(required = false) JsonNode body) {
@@ -123,7 +123,15 @@ public class OrderController {
     }
 
     /**
-     * 取消本人已创建订单。成功后状态为 CANCELLED，库存已按明细加回。
+     * 模拟支付。仅待支付可支付，成功后状态为 PAID，库存不变。
+     */
+    @PostMapping("/api/orders/{id}/pay")
+    public ApiResponse<Map<String, Object>> pay(HttpServletRequest request, @PathVariable String id) {
+        return ApiResponse.ok(orderService.pay(JwtAuthFilter.userId(request), parseId(id, "订单不存在")));
+    }
+
+    /**
+     * 取消本人待支付订单。成功后状态为 CANCELLED，库存已按明细加回。
      */
     @PostMapping("/api/orders/{id}/cancel")
     public ApiResponse<Map<String, Object>> cancel(HttpServletRequest request, @PathVariable String id) {

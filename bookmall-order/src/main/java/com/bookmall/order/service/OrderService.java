@@ -12,6 +12,7 @@ import com.bookmall.order.mapper.CartItemMapper;
 import com.bookmall.order.mapper.OrderItemMapper;
 import com.bookmall.order.mapper.OrderMainMapper;
 import com.bookmall.order.mapper.StockHoldMapper;
+import com.bookmall.order.mq.PayTimeoutPublisher;
 import com.bookmall.common.api.PageResult;
 import com.bookmall.common.error.BusinessException;
 import com.bookmall.common.web.PageQuery;
@@ -38,9 +39,9 @@ import java.util.UUID;
 /**
  * 下单、订单列表和订单详情。
  * <p>
- * 第一版只结算当前用户的全部购物车，不支持勾选部分商品。同一用户的下单会串行执行。
+ * 可以结算全部购物车，也可以只结算请求体里的 {@code itemIds}。同一用户的下单会串行执行。
  * 扣库存前先提交占用令牌；写订单失败或进程中断时，按同一令牌把库存加回。
- * 订单落库成功后再投递 MQ 通知，投递失败不影响订单。
+ * 新订单是待支付。落库成功后投递下单通知和支付超时消息，投递失败不影响订单。
  */
 @Service
 @RequiredArgsConstructor
@@ -69,6 +70,9 @@ public class OrderService {
     /** 经 RabbitMQ 投递站内信。 */
     private final NotificationPublisher notifications;
 
+    /** 待支付超时后自动取消。 */
+    private final PayTimeoutPublisher payTimeouts;
+
     /** 在同一事务里写订单并清空购物车。 */
     private final OrderWriter writer;
 
@@ -85,27 +89,25 @@ public class OrderService {
     private final SecureRandom random = new SecureRandom();
 
     /**
-     * 用当前购物车创建一笔订单。
+     * 用购物车创建一笔待支付订单。
      * <p>
-     * 请求体里如果带了 {@code itemIds}，直接拒绝，避免调用方以为可以部分结算。
-     * 校验顺序是：购物车非空、图书都存在、都在售、库存都够，然后才扣库存和写订单。
+     * 请求体省略 {@code itemIds} 时结算全部购物车。空数组拒绝。
+     * 校验顺序是：条目合法、购物车非空、图书都存在、都在售、库存都够，然后才扣库存和写订单。
      *
      * @param userId 当前用户
-     * @param body   可空；出现 itemIds 时视为参数不合法
+     * @param body   可空；可含 itemIds
      * @return 新订单详情
      */
     @Transactional
     public Map<String, Object> create(long userId, JsonNode body) {
-        if (body != null && body.has("itemIds")) {
-            throw BusinessException.badRequest("第一版仅支持结算全部购物车");
-        }
+        List<Long> itemIds = readItemIds(body);
         // 同一用户串行下单，避免连点读到同一份购物车、扣两次库存。
         checkoutLock.lock(userId);
         if (TransactionAspectSupport.currentTransactionStatus().isNewTransaction()) {
             // 上次进程在扣库存和写订单之间停掉时，stock_hold 里还留着令牌。先按原令牌把库存加回。
             recoverHolds(userId);
         }
-        List<Line> lines = loadCheckoutLines(userId);
+        List<Line> lines = loadCheckoutLines(userId, itemIds);
 
         // 每一本书一个新令牌。图书服务用它保证同一笔只扣一次、只补一次。
         List<Hold> pending = new ArrayList<>();
@@ -141,20 +143,21 @@ public class OrderService {
             compensate(userId, attempted, ex);
             throw ex;
         }
-        // 通知失败只记日志，不回滚已经成功的订单。
+        // 通知和超时消息失败只记日志，不回滚已经成功的订单。
         notifications.orderCreated(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
+        payTimeouts.schedule(order.getId(), userId);
         return detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
                 .eq(OrderItem::getOrderId, order.getId())
                 .orderByAsc(OrderItem::getId)));
     }
 
     /**
-     * 取消本人的已创建订单：先改状态再还库存，最后投递取消通知。
+     * 取消本人的待支付订单：先改状态再还库存，最后投递取消通知。
      * <p>
      * 故意不加类级大事务包住 HTTP 还库存：先把状态改成 CANCELLED，再按明细加库存。
-     * 中途失败时，已加回的数量用扣减接口扣回去，扣回成功才改回 CREATED。
+     * 中途失败时，已加回的数量用扣减接口扣回去，扣回成功才改回待支付。
      * 扣不回去就保持 CANCELLED，避免再次取消把同一批库存再加一次。
-     * 他人订单或不存在统一 404，避免探测。
+     * 他人订单或不存在统一 404，避免探测。已支付不可取消。
      */
     public Map<String, Object> cancel(long userId, long orderId) {
         OrderMain order = orders.selectOne(Wrappers.<OrderMain>lambdaQuery()
@@ -163,7 +166,7 @@ public class OrderService {
         if (order == null) {
             throw BusinessException.notFound("订单不存在");
         }
-        if (order.getStatus() == null || order.getStatus() != OrderMain.CREATED) {
+        if (order.getStatus() == null || order.getStatus() != OrderMain.PENDING_PAY) {
             throw new BusinessException(400, 40008, "订单状态不允许取消");
         }
         // 先占住 CANCELLED，避免两个取消请求一起还库存。
@@ -171,7 +174,7 @@ public class OrderService {
                 .set(OrderMain::getStatus, OrderMain.CANCELLED)
                 .eq(OrderMain::getId, orderId)
                 .eq(OrderMain::getUserId, userId)
-                .eq(OrderMain::getStatus, OrderMain.CREATED));
+                .eq(OrderMain::getStatus, OrderMain.PENDING_PAY));
         if (updated != 1) {
             throw new BusinessException(400, 40008, "订单状态不允许取消");
         }
@@ -185,12 +188,12 @@ public class OrderService {
                 restored.add(item);
             }
         } catch (RuntimeException ex) {
-            // 前面几本已经加回。先按同样数量扣回，扣回成功才改回 CREATED。
+            // 前面几本已经加回。先按同样数量扣回，扣回成功才改回待支付。
             // 扣不回去就保持 CANCELLED，避免用户再次取消把库存再加一遍。
             log.error("取消订单还库存失败 orderId={} userId={}", orderId, userId, ex);
             if (undoCancelRestores(orderId, restored)) {
                 orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
-                        .set(OrderMain::getStatus, OrderMain.CREATED)
+                        .set(OrderMain::getStatus, OrderMain.PENDING_PAY)
                         .eq(OrderMain::getId, orderId)
                         .eq(OrderMain::getUserId, userId)
                         .eq(OrderMain::getStatus, OrderMain.CANCELLED));
@@ -202,6 +205,73 @@ public class OrderService {
         order.setStatus(OrderMain.CANCELLED);
         notifications.orderCancelled(userId, order.getOrderNo());
         return detailView(order, orderItems);
+    }
+
+    /**
+     * 模拟支付：待支付改为已支付，不再扣减或加回库存。
+     * 已支付、已取消都返回 40008。重复点击不会第二次改状态。
+     */
+    public Map<String, Object> pay(long userId, long orderId) {
+        OrderMain order = orders.selectOne(Wrappers.<OrderMain>lambdaQuery()
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId));
+        if (order == null) {
+            throw BusinessException.notFound("订单不存在");
+        }
+        int updated = orders.update(null, Wrappers.<OrderMain>lambdaUpdate()
+                .set(OrderMain::getStatus, OrderMain.PAID)
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId)
+                .eq(OrderMain::getStatus, OrderMain.PENDING_PAY));
+        if (updated != 1) {
+            throw new BusinessException(400, 40008, "订单状态不允许支付");
+        }
+        order.setStatus(OrderMain.PAID);
+        notifications.orderPaid(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
+        return detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
+                .eq(OrderItem::getOrderId, orderId)
+                .orderByAsc(OrderItem::getId)));
+    }
+
+    /**
+     * 超时关单。已经支付或取消时直接返回，供消息消费端确认，避免重复还库存。
+     */
+    public void expireIfPending(long userId, long orderId) {
+        OrderMain order = orders.selectOne(Wrappers.<OrderMain>lambdaQuery()
+                .eq(OrderMain::getId, orderId)
+                .eq(OrderMain::getUserId, userId));
+        if (order == null || order.getStatus() == null || order.getStatus() != OrderMain.PENDING_PAY) {
+            return;
+        }
+        cancel(userId, orderId);
+    }
+
+    /**
+     * 解析勾选的购物车主键。缺省或 JSON null 表示结算全部。
+     * 空数组、非数组、非正整数都是参数不合法。
+     */
+    private static List<Long> readItemIds(JsonNode body) {
+        if (body == null || body.isNull() || !body.has("itemIds") || body.get("itemIds").isNull()) {
+            return null;
+        }
+        JsonNode node = body.get("itemIds");
+        if (!node.isArray()) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        if (node.isEmpty()) {
+            throw BusinessException.badRequest("请选择要结算的商品");
+        }
+        List<Long> ids = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (!item.isIntegralNumber() || item.asLong() <= 0) {
+                throw BusinessException.badRequest("参数不合法");
+            }
+            long id = item.asLong();
+            if (!ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 
     /**
@@ -248,13 +318,21 @@ public class OrderService {
     }
 
     /**
-     * 读取当前用户的购物车，并按固定顺序核对每一行。
+     * 读取要结算的购物车行，并按固定顺序核对每一行。
+     * {@code itemIds} 为空时取全部。指定了主键却对不上本人购物车时，按参数不合法返回。
      * 购物车为空、图书不存在、未上架、库存不足都在这里抛出，调用方拿到的就是可以扣库存的明细。
      */
-    private List<Line> loadCheckoutLines(long userId) {
-        List<CartItem> cart = carts.selectList(Wrappers.<CartItem>lambdaQuery()
+    private List<Line> loadCheckoutLines(long userId, List<Long> itemIds) {
+        var query = Wrappers.<CartItem>lambdaQuery()
                 .eq(CartItem::getUserId, userId)
-                .orderByAsc(CartItem::getId));
+                .orderByAsc(CartItem::getId);
+        if (itemIds != null) {
+            query.in(CartItem::getId, itemIds);
+        }
+        List<CartItem> cart = carts.selectList(query);
+        if (itemIds != null && cart.size() != itemIds.size()) {
+            throw BusinessException.badRequest("购物车条目不存在");
+        }
         if (cart.isEmpty()) {
             throw new BusinessException(400, 40005, "购物车为空");
         }
@@ -441,14 +519,13 @@ public class OrderService {
         return row;
     }
 
-    /** 列表和详情共用的订单头。数字状态映射为 CREATED / CANCELLED。 */
+    /** 列表和详情共用的订单头。数字状态映射为 PENDING_PAY / CANCELLED / PAID。 */
     private Map<String, Object> header(OrderMain order) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", order.getId());
         row.put("orderNo", order.getOrderNo());
         row.put("totalAmount", Texts.money(order.getTotalAmount()));
-        short status = order.getStatus() == null ? OrderMain.CREATED : order.getStatus();
-        row.put("status", status == OrderMain.CANCELLED ? "CANCELLED" : "CREATED");
+        row.put("status", OrderMain.statusName(order.getStatus()));
         row.put("createdAt", Texts.time(order.getCreatedAt()));
         return row;
     }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 消费订单服务投递的站内信消息，按 bizKey 幂等入库。
+ * 参数不合法时确认丢弃。数据库等瞬时失败向外抛出，由监听器有限次重试，超过后进入死信队列。
  */
 @Component
 @Profile("!test")

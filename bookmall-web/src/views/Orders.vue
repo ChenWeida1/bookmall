@@ -1,7 +1,7 @@
 <template>
   <main class="page">
     <h1>我的订单</h1>
-    <p class="muted">仅显示当前用户订单，按创建时间倒序。已创建订单可取消。</p>
+    <p class="muted">仅显示当前用户订单，按创建时间倒序。待支付订单可支付或取消。</p>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="message" class="muted">{{ message }}</p>
     <p v-if="!ready" class="muted">加载中</p>
@@ -20,7 +20,7 @@
           <td>
             <router-link :to="`/orders/${order.id}`">查看详情</router-link>
             <button
-              v-if="order.status === 'CREATED'"
+              v-if="order.status === 'PENDING_PAY'"
               class="ghost"
               style="margin-left: 8px"
               :disabled="busyId === order.id"

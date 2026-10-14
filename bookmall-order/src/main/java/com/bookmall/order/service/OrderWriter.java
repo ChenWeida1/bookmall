@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * 在一个本地事务里保存订单、明细并清空购物车。
+ * 在一个本地事务里保存订单、明细并删除已结算的购物车行。
  * <p>
  * 库存扣减发生在目录服务，不在这个事务里。这里失败时由 {@link OrderService} 负责回补已扣库存。
  * 单独成类是为了让 {@code @Transactional} 通过 Spring 代理生效，避免同类自调用绕过事务。
@@ -34,7 +34,7 @@ public class OrderWriter {
     private final CartItemMapper carts;
 
     /**
-     * 写入订单和明细，然后删除该用户的全部购物车条目。
+     * 写入待支付订单和明细，然后只删除本次结算的购物车条目。
      *
      * @param userId  下单用户
      * @param orderNo 已生成且未占用的订单号
@@ -48,7 +48,7 @@ public class OrderWriter {
         order.setOrderNo(orderNo);
         order.setUserId(userId);
         order.setTotalAmount(total);
-        order.setStatus(OrderMain.CREATED);
+        order.setStatus(OrderMain.PENDING_PAY);
         orders.insert(order);
         for (OrderService.Line line : lines) {
             OrderItem item = new OrderItem();
@@ -59,7 +59,9 @@ public class OrderWriter {
             item.setQuantity(line.item().getQuantity());
             items.insert(item);
         }
-        carts.delete(Wrappers.<CartItem>lambdaQuery().eq(CartItem::getUserId, userId));
+        carts.delete(Wrappers.<CartItem>lambdaQuery()
+                .eq(CartItem::getUserId, userId)
+                .in(CartItem::getId, lines.stream().map(line -> line.item().getId()).toList()));
         return order;
     }
 }

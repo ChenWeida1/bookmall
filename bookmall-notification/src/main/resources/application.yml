@@ -6,6 +6,17 @@ spring:
     default: dev
   application:
     name: bookmall-notification
+  rabbitmq:
+    listener:
+      simple:
+        # 拒绝后不重新入队，配合队列死信参数进入死信队列。
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2.0
+          max-interval: 10000ms
   datasource:
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'

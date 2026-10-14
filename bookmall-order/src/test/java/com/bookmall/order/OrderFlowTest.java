@@ -3,6 +3,7 @@ package com.bookmall.order;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.bookmall.order.client.CatalogClient;
 import com.bookmall.order.client.NotificationPublisher;
+import com.bookmall.order.mq.PayTimeoutPublisher;
 import com.bookmall.order.entity.CartItem;
 import com.bookmall.order.mapper.CartItemMapper;
 import com.bookmall.order.service.CartService;
@@ -56,6 +57,9 @@ class OrderFlowTest {
     @MockBean
     NotificationPublisher notifications;
 
+    @MockBean
+    PayTimeoutPublisher payTimeouts;
+
     /** 空购物车不能下单，错误码 40005。 */
     @Test
     void emptyCartFails() {
@@ -79,9 +83,10 @@ class OrderFlowTest {
         saveCart(910003L, 1L, 2);
         when(catalog.getBook(1L)).thenReturn(book(1, 12));
         var created = orders.create(910003L, null);
-        assertEquals("CREATED", created.get("status"));
+        assertEquals("PENDING_PAY", created.get("status"));
         assertTrue(carts.selectList(Wrappers.<CartItem>lambdaQuery().eq(CartItem::getUserId, 910003L)).isEmpty());
         verify(notifications).orderCreated(eq(910003L), anyString(), eq("79.60"));
+        verify(payTimeouts).schedule(eq(((Number) created.get("id")).longValue()), eq(910003L));
     }
 
     /** 第二本书扣减失败时，已经扣掉的第一本书要被回补。 */
@@ -144,7 +149,7 @@ class OrderFlowTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> orders.cancel(910032L, id));
         assertEquals(50000, ex.getCode());
         verify(catalog).deduct(eq(1L), eq(1), startsWith("cancel-undo-"));
-        assertEquals("CREATED", orders.detail(910032L, id).get("status"));
+        assertEquals("PENDING_PAY", orders.detail(910032L, id).get("status"));
         verify(notifications, never()).orderCancelled(anyLong(), anyString());
     }
 
@@ -184,6 +189,66 @@ class OrderFlowTest {
                 .eq(CartItem::getUserId, 910010L)
                 .eq(CartItem::getBookId, 1L));
         assertEquals(2, item.getQuantity());
+    }
+
+    /** 只结算勾选的购物车行，另一行留在购物车。 */
+    @Test
+    void checkoutSelectedItemsLeavesTheRest() throws Exception {
+        saveCart(910040L, 1L, 1);
+        saveCart(910040L, 2L, 1);
+        when(catalog.getBook(1L)).thenReturn(book(1, 5));
+        CartItem first = carts.selectOne(Wrappers.<CartItem>lambdaQuery()
+                .eq(CartItem::getUserId, 910040L)
+                .eq(CartItem::getBookId, 1L));
+        var created = orders.create(910040L, json.readTree("{\"itemIds\":[" + first.getId() + "]}"));
+        assertEquals("PENDING_PAY", created.get("status"));
+        assertEquals("39.80", created.get("totalAmount"));
+        assertEquals(1, carts.selectCount(Wrappers.<CartItem>lambdaQuery().eq(CartItem::getUserId, 910040L)));
+    }
+
+    /** 空的勾选列表不能下单。 */
+    @Test
+    void emptySelectionIsRejected() throws Exception {
+        saveCart(910041L, 1L, 1);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> orders.create(910041L, json.readTree("{\"itemIds\":[]}")));
+        assertEquals(40001, ex.getCode());
+        verify(catalog, never()).deduct(anyLong(), anyInt(), anyString());
+    }
+
+    /** 模拟支付只改状态，不还库存。再次支付和取消已支付订单都被拒绝。 */
+    @Test
+    void payThenRejectsRepeatAndCancel() {
+        saveCart(910042L, 1L, 1);
+        when(catalog.getBook(1L)).thenReturn(book(1, 5));
+        var created = orders.create(910042L, null);
+        long id = ((Number) created.get("id")).longValue();
+        var paid = orders.pay(910042L, id);
+        assertEquals("PAID", paid.get("status"));
+        verify(catalog, never()).restoreQuantity(anyLong(), anyInt());
+        verify(notifications).orderPaid(eq(910042L), anyString(), eq("39.80"));
+        assertEquals(40008, assertThrows(BusinessException.class, () -> orders.pay(910042L, id)).getCode());
+        assertEquals(40008, assertThrows(BusinessException.class, () -> orders.cancel(910042L, id)).getCode());
+    }
+
+    /** 超时消息在仍待支付时取消并还库存；已支付后再到期则什么都不做。 */
+    @Test
+    void expireCancelsPendingAndIgnoresPaid() {
+        saveCart(910043L, 1L, 1);
+        when(catalog.getBook(1L)).thenReturn(book(1, 5));
+        var pending = orders.create(910043L, null);
+        long pendingId = ((Number) pending.get("id")).longValue();
+        orders.expireIfPending(910043L, pendingId);
+        assertEquals("CANCELLED", orders.detail(910043L, pendingId).get("status"));
+        verify(catalog).restoreQuantity(1L, 1);
+
+        saveCart(910044L, 1L, 1);
+        var paid = orders.create(910044L, null);
+        long paidId = ((Number) paid.get("id")).longValue();
+        orders.pay(910044L, paidId);
+        orders.expireIfPending(910044L, paidId);
+        assertEquals("PAID", orders.detail(910044L, paidId).get("status"));
+        verify(catalog, org.mockito.Mockito.times(1)).restoreQuantity(anyLong(), anyInt());
     }
 
     /** 写入一条测试用购物车记录。 */

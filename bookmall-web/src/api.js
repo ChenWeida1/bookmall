@@ -67,7 +67,8 @@ export function formatTime(value) {
 }
 
 export function statusLabel(status) {
-  if (status === 'CREATED') return '已创建'
+  if (status === 'PENDING_PAY') return '待支付'
+  if (status === 'PAID') return '已支付'
   if (status === 'CANCELLED') return '已取消'
   if (status === 'ON_SALE') return '在售'
   if (status === 'OFF_SALE') return '下架'
