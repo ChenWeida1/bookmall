@@ -1,0 +1,17 @@
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+  catalog-base-url: ${BOOKMALL_CATALOG_BASE_URL:http://127.0.0.1:8082}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/bookmall_assistant
+    username: bookmall_assistant_app
+    password: ${BOOKMALL_ASSISTANT_DB_PASSWORD}
+
+management:
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://127.0.0.1:9411/api/v2/spans}
+      export:
+        enabled: ${ZIPKIN_EXPORT_ENABLED:false}

@@ -16,3 +16,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/bookmall_book
     username: bookmall_book_app
     password: bookmall_book_dev
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+      export:
+        enabled: true

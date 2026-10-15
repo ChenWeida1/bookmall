@@ -1,0 +1,15 @@
+[Unit]
+Description=BookMall Seata TC
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/seata
+Environment=SEATA_STORE_DB_URL=jdbc:postgresql://127.0.0.1:5432/bookmall_seata
+Environment=SEATA_STORE_DB_USER=bookmall_seata_app
+Environment=SEATA_STORE_DB_PASSWORD=bookmall_seata_dev
+ExecStart=/opt/seata/bin/seata-server.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

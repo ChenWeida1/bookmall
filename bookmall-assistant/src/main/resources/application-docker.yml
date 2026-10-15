@@ -1,0 +1,27 @@
+server:
+  port: 8085
+
+bookmall:
+  jwt:
+    secret: ${BOOKMALL_JWT_SECRET}
+  catalog-base-url: ${BOOKMALL_CATALOG_BASE_URL:}
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${BOOKMALL_NACOS_ENABLED:true}
+        server-addr: ${BOOKMALL_NACOS_ADDR:nacos:8848}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+
+management:
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+      export:
+        enabled: ${ZIPKIN_EXPORT_ENABLED:false}

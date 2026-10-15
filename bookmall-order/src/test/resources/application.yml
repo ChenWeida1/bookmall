@@ -12,8 +12,15 @@ spring:
     username: bookmall_order_app
     password: bookmall_order_dev
 
+seata:
+  enabled: false
+
 bookmall:
   jwt:
     secret: bookmall-dev-jwt-secret-key-32b!
   catalog-base-url: http://localhost:8082
   notification-base-url: http://localhost:8084
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

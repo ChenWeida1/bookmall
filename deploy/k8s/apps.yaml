@@ -76,6 +76,10 @@ spec:
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_REDIS_HOST } }
             - name: SPRING_DATA_REDIS_PORT
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_REDIS_PORT } }
+            - name: SEATA_ADDR
+              valueFrom: { configMapKeyRef: { name: bookmall-config, key: SEATA_ADDR } }
+            - name: ZIPKIN_EXPORT_ENABLED
+              value: "false"
 ---
 apiVersion: v1
 kind: Service
@@ -127,6 +131,10 @@ spec:
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_RABBITMQ_USER } }
             - name: SPRING_RABBITMQ_PASSWORD
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_RABBITMQ_PASSWORD } }
+            - name: SEATA_ADDR
+              valueFrom: { configMapKeyRef: { name: bookmall-config, key: SEATA_ADDR } }
+            - name: ZIPKIN_EXPORT_ENABLED
+              value: "false"
 ---
 apiVersion: v1
 kind: Service
@@ -217,6 +225,10 @@ spec:
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_ORDER_URI } }
             - name: BOOKMALL_NOTIFICATION_URI
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_NOTIFICATION_URI } }
+            - name: BOOKMALL_ASSISTANT_URI
+              valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_ASSISTANT_URI } }
+            - name: ZIPKIN_EXPORT_ENABLED
+              value: "false"
 ---
 apiVersion: v1
 kind: Service
@@ -230,3 +242,50 @@ spec:
     - port: 8080
       targetPort: 8080
       nodePort: 30080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assistant
+  namespace: bookmall
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: assistant }
+  template:
+    metadata:
+      labels: { app: assistant }
+    spec:
+      containers:
+        - name: assistant
+          image: bookmall-assistant:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8085 }]
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: BOOKMALL_NACOS_ENABLED
+              value: "false"
+            - name: ZIPKIN_EXPORT_ENABLED
+              value: "false"
+            - name: BOOKMALL_JWT_SECRET
+              valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_JWT_SECRET } }
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/bookmall_assistant
+            - name: SPRING_DATASOURCE_USERNAME
+              value: bookmall_assistant_app
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_ASSISTANT_DB_PASSWORD } }
+            - name: BOOKMALL_CATALOG_BASE_URL
+              valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_CATALOG_BASE_URL } }
+            - name: AI_API_KEY
+              valueFrom: { secretKeyRef: { name: bookmall-secret, key: AI_API_KEY } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: assistant
+  namespace: bookmall
+spec:
+  selector: { app: assistant }
+  ports: [{ port: 8085, targetPort: 8085 }]

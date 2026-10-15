@@ -1,0 +1,22 @@
+bookmall:
+  jwt:
+    secret: bookmall-dev-jwt-secret-key-32b!
+  catalog-base-url: ${BOOKMALL_CATALOG_BASE_URL:}
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: localhost:8848
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmall_assistant
+    username: bookmall_assistant_app
+    password: bookmall_assistant_dev
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+      export:
+        enabled: true

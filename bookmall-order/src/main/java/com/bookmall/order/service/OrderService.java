@@ -21,6 +21,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import lombok.RequiredArgsConstructor;
+import org.apache.seata.core.context.RootContext;
+import org.apache.seata.spring.annotation.GlobalTransactional;
+import org.apache.seata.tm.api.transaction.TransactionHookAdapter;
+import org.apache.seata.tm.api.transaction.TransactionHookManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
@@ -40,8 +44,9 @@ import java.util.UUID;
  * 下单、订单列表和订单详情。
  * <p>
  * 可以结算全部购物车，也可以只结算请求体里的 {@code itemIds}。同一用户的下单会串行执行。
- * 扣库存前先提交占用令牌；写订单失败或进程中断时，按同一令牌把库存加回。
- * 新订单是待支付。落库成功后投递下单通知和支付超时消息，投递失败不影响订单。
+ * 扣库存和写订单在同一个 Seata 全局事务里。写订单失败时由 undo log 回滚库存，不再手工回补。
+ * 扣库存前仍先提交占用令牌，进程在全局事务提交前中断时，下次下单按令牌兜底；令牌已被 undo 删掉则回补是空操作。
+ * 新订单是待支付。全局事务提交之后投递下单通知和支付超时消息，投递失败不影响订单。
  */
 @Service
 @RequiredArgsConstructor
@@ -93,11 +98,13 @@ public class OrderService {
      * <p>
      * 请求体省略 {@code itemIds} 时结算全部购物车。空数组拒绝。
      * 校验顺序是：条目合法、购物车非空、图书都存在、都在售、库存都够，然后才扣库存和写订单。
+     * 扣库存加入当前全局事务。写订单失败时异常直接抛出，由 Seata 回滚已扣库存。
      *
      * @param userId 当前用户
      * @param body   可空；可含 itemIds
      * @return 新订单详情
      */
+    @GlobalTransactional(name = "bookmall-create-order", rollbackFor = Exception.class)
     @Transactional
     public Map<String, Object> create(long userId, JsonNode body) {
         List<Long> itemIds = readItemIds(body);
@@ -116,39 +123,51 @@ public class OrderService {
         }
         // 先单独提交占用。后面扣库存的 HTTP 成功后进程若退出，订单库仍能找到这些令牌。
         persistHolds(userId, pending);
-        List<Hold> attempted = new ArrayList<>();
-        OrderMain order;
-        try {
-            for (int i = 0; i < pending.size(); i++) {
-                Hold hold = pending.get(i);
-                attempted.add(hold);
-                try {
-                    catalog.deduct(hold.bookId(), hold.quantity(), hold.token());
-                } catch (BusinessException ex) {
-                    // 校验之后库存仍可能被别人买走。对外仍按整单库存不足返回，并带上 data.items。
-                    if (ex.getCode() != 40006) {
-                        throw ex;
-                    }
-                    throw shortage(lines.get(i), ex.getData());
+        for (int i = 0; i < pending.size(); i++) {
+            Hold hold = pending.get(i);
+            try {
+                catalog.deduct(hold.bookId(), hold.quantity(), hold.token());
+            } catch (BusinessException ex) {
+                // 校验之后库存仍可能被别人买走。对外仍按整单库存不足返回，并带上 data.items。
+                // 已经扣掉的库存随全局事务回滚，这里不再手工回补。
+                if (ex.getCode() != 40006) {
+                    throw ex;
                 }
+                throw shortage(lines.get(i), ex.getData());
             }
-            BigDecimal total = lines.stream()
-                    .map(line -> Texts.times(line.book().price(), line.item().getQuantity()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            order = writer.save(userId, nextOrderNo(), total, lines);
-            // 订单已写下，占用完成，删掉令牌。库存保持已扣状态。
-            holds.delete(Wrappers.<StockHold>lambdaQuery().eq(StockHold::getUserId, userId));
-        } catch (RuntimeException ex) {
-            // 写订单失败：用同一令牌回补。令牌已回补过的不会再次加库存。
-            compensate(userId, attempted, ex);
-            throw ex;
         }
-        // 通知和超时消息失败只记日志，不回滚已经成功的订单。
-        notifications.orderCreated(userId, order.getOrderNo(), Texts.money(order.getTotalAmount()));
-        payTimeouts.schedule(order.getId(), userId);
+        BigDecimal total = lines.stream()
+                .map(line -> Texts.times(line.book().price(), line.item().getQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        OrderMain order = writer.save(userId, nextOrderNo(), total, lines);
+        // 订单已写下，占用完成，删掉令牌。库存保持已扣状态。
+        holds.delete(Wrappers.<StockHold>lambdaQuery().eq(StockHold::getUserId, userId));
+        // 通知和超时消息在全局事务提交之后发出。消息失败只记日志。
+        afterOrderCommitted(order);
         return detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
                 .eq(OrderItem::getOrderId, order.getId())
                 .orderByAsc(OrderItem::getId)));
+    }
+
+    /**
+     * 全局事务提交后再发通知和支付超时消息。
+     * 测试里关闭了 Seata，没有全局事务时就在当前调用里发出，方便断言。
+     */
+    private void afterOrderCommitted(OrderMain order) {
+        Runnable notify = () -> {
+            notifications.orderCreated(order.getUserId(), order.getOrderNo(), Texts.money(order.getTotalAmount()));
+            payTimeouts.schedule(order.getId(), order.getUserId());
+        };
+        if (RootContext.inGlobalTransaction()) {
+            TransactionHookManager.registerHook(new TransactionHookAdapter() {
+                @Override
+                public void afterCommit() {
+                    notify.run();
+                }
+            });
+            return;
+        }
+        notify.run();
     }
 
     /**
@@ -392,7 +411,10 @@ public class OrderService {
         }
     }
 
-    /** 下单事务自己提交时，占用单独提交，以便进程中断后仍能找到令牌。 */
+    /**
+     * 下单事务自己提交时，占用单独提交，以便进程中断后仍能找到令牌。
+     * 全局事务进行中先解绑 XID，避免这次提交被 Seata 当成同一分支，回滚时把兜底令牌也删掉。
+     */
     private void persistHolds(long userId, List<Hold> pending) {
         List<StockHold> rows = pending.stream().map(hold -> {
             StockHold row = new StockHold();
@@ -403,31 +425,16 @@ public class OrderService {
             return row;
         }).toList();
         if (TransactionAspectSupport.currentTransactionStatus().isNewTransaction()) {
-            holdWriter.commit(rows);
+            String xid = RootContext.unbind();
+            try {
+                holdWriter.commit(rows);
+            } finally {
+                if (xid != null) {
+                    RootContext.bind(xid);
+                }
+            }
         } else {
             rows.forEach(holds::insert);
-        }
-    }
-
-    /**
-     * 按令牌回补已尝试扣减的库存。全部回补成功时保留原始业务错误；任一回补失败则返回服务器内部错误。
-     */
-    private void compensate(long userId, List<Hold> attempted, RuntimeException cause) {
-        boolean failed = false;
-        for (int i = attempted.size() - 1; i >= 0; i--) {
-            Hold hold = attempted.get(i);
-            try {
-                catalog.restore(hold.bookId(), hold.quantity(), hold.token());
-                log.error("扣减后下单失败，库存已回补 userId={} bookId={} quantity={} token={}",
-                        userId, hold.bookId(), hold.quantity(), hold.token(), cause);
-            } catch (RuntimeException ex) {
-                failed = true;
-                log.error("回补库存失败 userId={} bookId={} quantity={} token={}",
-                        userId, hold.bookId(), hold.quantity(), hold.token(), ex);
-            }
-        }
-        if (failed) {
-            throw new BusinessException(500, 50000, "服务器内部错误");
         }
     }
 

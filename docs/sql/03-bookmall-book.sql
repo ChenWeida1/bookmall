@@ -57,6 +57,23 @@ COMMENT ON COLUMN stock_change.quantity IS '本次变更数量';
 COMMENT ON COLUMN stock_change.deducted IS 'true=已扣减，false=已回补';
 COMMENT ON COLUMN stock_change.created_at IS '首次记录时间，UTC';
 
+CREATE TABLE undo_log (
+    id            SERIAL       NOT NULL,
+    branch_id     BIGINT       NOT NULL,
+    xid           VARCHAR(128) NOT NULL,
+    context       VARCHAR(128) NOT NULL,
+    rollback_info BYTEA        NOT NULL,
+    log_status    INT          NOT NULL,
+    log_created   TIMESTAMP(0) NOT NULL,
+    log_modified  TIMESTAMP(0) NOT NULL,
+    CONSTRAINT pk_undo_log PRIMARY KEY (id),
+    CONSTRAINT ux_undo_log UNIQUE (xid, branch_id)
+);
+CREATE INDEX ix_log_created ON undo_log (log_created);
+COMMENT ON TABLE undo_log IS 'Seata AT 回滚日志。由图书服务在全局事务中写入。';
+
 ALTER TABLE category OWNER TO bookmall_book_app;
 ALTER TABLE book OWNER TO bookmall_book_app;
 ALTER TABLE stock_change OWNER TO bookmall_book_app;
+ALTER TABLE undo_log OWNER TO bookmall_book_app;
+ALTER SEQUENCE undo_log_id_seq OWNER TO bookmall_book_app;

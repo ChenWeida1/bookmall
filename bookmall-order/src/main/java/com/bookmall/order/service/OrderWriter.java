@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * 在一个本地事务里保存订单、明细并删除已结算的购物车行。
  * <p>
- * 库存扣减发生在目录服务，不在这个事务里。这里失败时由 {@link OrderService} 负责回补已扣库存。
+ * 库存扣减发生在目录服务，并加入同一个 Seata 全局事务。这里失败时由 undo log 回滚库存。
  * 单独成类是为了让 {@code @Transactional} 通过 Spring 代理生效，避免同类自调用绕过事务。
  */
 @Service

@@ -78,6 +78,25 @@ public class CatalogService {
         return cache.getOrLoad(key, () -> loadBooks(query, categoryId, keyword));
     }
 
+    /**
+     * 客服内部查书。公开列表只含在售书，这里连下架书一起返回，并带上价格、库存和状态。
+     * 书名、作者、分类都空时不扫全表，直接返回空列表。
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> searchForAssistant(String title, String author, String category) {
+        String titlePattern = likePattern(title);
+        String authorPattern = likePattern(author);
+        String categoryPattern = likePattern(category);
+        if (titlePattern == null && authorPattern == null && categoryPattern == null) {
+            return List.of();
+        }
+        return books.searchForAssistant(titlePattern, authorPattern, categoryPattern).stream().map(book -> {
+            Map<String, Object> item = listItem(book);
+            item.put("status", Book.statusName(book.getOnSale()));
+            return item;
+        }).toList();
+    }
+
     private PageResult<Map<String, Object>> loadBooks(PageQuery query, Long categoryId, String keyword) {
         if (categoryId != null && categories.selectById(categoryId) == null) {
             return new PageResult<>(query.page(), query.size(), 0, List.of());

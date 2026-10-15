@@ -8,6 +8,7 @@
           <router-link to="/cart">购物车</router-link>
           <router-link to="/orders">我的订单</router-link>
           <router-link to="/notifications">消息</router-link>
+          <router-link to="/assistant">客服</router-link>
           <router-link v-if="admin" to="/admin/books">管理</router-link>
           <router-link v-if="admin" to="/admin/orders">订单</router-link>
           <router-link v-if="admin" to="/admin/dead-letters">死信</router-link>

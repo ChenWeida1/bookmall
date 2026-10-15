@@ -22,3 +22,10 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
+
+management:
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+      export:
+        enabled: ${ZIPKIN_EXPORT_ENABLED:false}

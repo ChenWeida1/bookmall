@@ -11,9 +11,12 @@ import com.bookmall.order.service.OrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bookmall.common.error.BusinessException;
 import org.junit.jupiter.api.Test;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +51,12 @@ class OrderFlowTest {
 
     @Autowired
     CartService cartService;
+
+    @Autowired
+    Environment environment;
+
+    @Autowired
+    Tracer tracer;
 
     private final ObjectMapper json = new ObjectMapper();
 
@@ -89,9 +98,9 @@ class OrderFlowTest {
         verify(payTimeouts).schedule(eq(((Number) created.get("id")).longValue()), eq(910003L));
     }
 
-    /** 第二本书扣减失败时，已经扣掉的第一本书要被回补。 */
+    /** 第二本书扣减失败时，不再手工回补。库存交给 Seata 回滚。 */
     @Test
-    void deductFailureRestoresEarlierBooks() {
+    void deductFailureDoesNotRestoreManually() {
         saveCart(910004L, 1L, 1);
         saveCart(910004L, 2L, 1);
         when(catalog.getBook(1L)).thenReturn(book(1, 5));
@@ -99,11 +108,10 @@ class OrderFlowTest {
         org.mockito.Mockito.doThrow(new BusinessException(400, 40006, "库存不足"))
                 .when(catalog).deduct(eq(2L), eq(1), anyString());
         assertThrows(BusinessException.class, () -> orders.create(910004L, null));
-        verify(catalog).restore(eq(1L), eq(1), anyString());
-        verify(catalog).restore(eq(2L), eq(1), anyString());
+        verify(catalog, never()).restore(anyLong(), anyInt(), anyString());
     }
 
-    /** 扣减时才发现库存不足，响应仍是 data.items，并且已经扣掉的库存要回补。 */
+    /** 扣减时才发现库存不足，响应仍是 data.items。已经扣掉的库存不再手工回补。 */
     @Test
     void deductRaceStillReportsItems() {
         saveCart(910030L, 1L, 2);
@@ -119,7 +127,28 @@ class OrderFlowTest {
         assertEquals("围城", row.get("bookTitle"));
         assertEquals(1, ((Number) row.get("stock")).intValue());
         assertEquals(2, ((Number) row.get("quantity")).intValue());
-        verify(catalog).restore(eq(1L), eq(2), anyString());
+        verify(catalog, never()).restore(anyLong(), anyInt(), anyString());
+    }
+
+    /** 日志级别图案带追踪号，并且能生成非空的 traceId。 */
+    @Test
+    void logPatternCarriesTraceId() throws Exception {
+        String configured = environment.getProperty("logging.pattern.level");
+        if (configured == null) {
+            try (var input = OrderService.class.getResourceAsStream("/application.yml")) {
+                configured = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+        }
+        assertTrue(configured != null && configured.contains("traceId"), configured);
+        assertTrue(configured.contains("spanId"), configured);
+        Span span = tracer.nextSpan().name("checkout").start();
+        try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+            String traceId = span.context().traceId();
+            assertTrue(traceId != null && traceId.length() >= 16);
+            assertTrue(traceId.chars().anyMatch(ch -> ch != '0'));
+        } finally {
+            span.end();
+        }
     }
 
     /** 取消成功：库存按数量加回，并投递取消通知。 */

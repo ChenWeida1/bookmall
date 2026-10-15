@@ -7,18 +7,26 @@ CREATE ROLE bookmall_user_app LOGIN PASSWORD 'bookmall_user_dev';
 CREATE ROLE bookmall_book_app LOGIN PASSWORD 'bookmall_book_dev';
 CREATE ROLE bookmall_order_app LOGIN PASSWORD 'bookmall_order_dev';
 CREATE ROLE bookmall_notification_app LOGIN PASSWORD 'bookmall_notification_dev';
+CREATE ROLE bookmall_seata_app LOGIN PASSWORD 'bookmall_seata_dev';
+CREATE ROLE bookmall_assistant_app LOGIN PASSWORD 'bookmall_assistant_dev';
 
 CREATE DATABASE bookmall_user OWNER bookmall_user_app ENCODING 'UTF8';
 CREATE DATABASE bookmall_book OWNER bookmall_book_app ENCODING 'UTF8';
 CREATE DATABASE bookmall_order OWNER bookmall_order_app ENCODING 'UTF8';
 CREATE DATABASE bookmall_notification OWNER bookmall_notification_app ENCODING 'UTF8';
+CREATE DATABASE bookmall_seata OWNER bookmall_seata_app ENCODING 'UTF8';
+CREATE DATABASE bookmall_assistant OWNER bookmall_assistant_app ENCODING 'UTF8';
 
 REVOKE ALL ON DATABASE bookmall_user FROM PUBLIC;
 REVOKE ALL ON DATABASE bookmall_book FROM PUBLIC;
 REVOKE ALL ON DATABASE bookmall_order FROM PUBLIC;
 REVOKE ALL ON DATABASE bookmall_notification FROM PUBLIC;
+REVOKE ALL ON DATABASE bookmall_seata FROM PUBLIC;
+REVOKE ALL ON DATABASE bookmall_assistant FROM PUBLIC;
 
 GRANT CONNECT ON DATABASE bookmall_user TO bookmall_user_app;
 GRANT CONNECT ON DATABASE bookmall_book TO bookmall_book_app;
 GRANT CONNECT ON DATABASE bookmall_order TO bookmall_order_app;
 GRANT CONNECT ON DATABASE bookmall_notification TO bookmall_notification_app;
+GRANT CONNECT ON DATABASE bookmall_seata TO bookmall_seata_app;
+GRANT CONNECT ON DATABASE bookmall_assistant TO bookmall_assistant_app;

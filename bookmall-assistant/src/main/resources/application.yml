@@ -1,0 +1,45 @@
+server:
+  port: 8085
+
+spring:
+  profiles:
+    default: dev
+  application:
+    name: bookmall-assistant
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+bookmall:
+  llm:
+    api-key: ${AI_API_KEY:}
+    base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+    model: ${AI_MODEL:glm-4.7}
+    temperature: 0.3
+    max-tokens: 2048
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      export:
+        enabled: false

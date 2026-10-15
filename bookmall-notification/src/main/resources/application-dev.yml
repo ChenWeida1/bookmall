@@ -17,3 +17,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/bookmall_notification
     username: bookmall_notification_app
     password: bookmall_notification_dev
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+      export:
+        enabled: true

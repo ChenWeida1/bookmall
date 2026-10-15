@@ -1,0 +1,18 @@
+[Unit]
+Description=BookMall assistant
+After=network.target
+
+[Service]
+Type=simple
+Environment=SPRING_PROFILES_ACTIVE=prd
+Environment=BOOKMALL_JWT_SECRET=change-me
+Environment=BOOKMALL_ASSISTANT_DB_PASSWORD=change-me
+Environment=BOOKMALL_CATALOG_BASE_URL=http://127.0.0.1:8082
+Environment=AI_API_KEY=
+Environment=AI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+Environment=AI_MODEL=glm-4.7
+ExecStart=/usr/bin/java -jar /opt/bookmall/bookmall-assistant.jar
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

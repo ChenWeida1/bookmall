@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.List;
+
 /**
  * 图书查询与库存变更。
  * <p>
@@ -36,6 +38,22 @@ public interface BookMapper extends BaseMapper<Book> {
             ORDER BY b.id ASC
             """)
     Page<Book> search(Page<Book> page, @Param("categoryId") Long categoryId, @Param("keyword") String keyword);
+
+    /**
+     * 给客服查书。包含下架书，最多 8 本。三个条件都是已转义的 LIKE 模式，null 表示不限制。
+     */
+    @Select("""
+            SELECT b.id, b.category_id, b.title, b.author, b.cover_url, b.price,
+                   b.stock, b.description, b.on_sale, c.name AS category_name
+            FROM book b
+            INNER JOIN category c ON c.id = b.category_id
+            WHERE (CAST(#{title,jdbcType=VARCHAR} AS VARCHAR) IS NULL OR lower(b.title) LIKE #{title,jdbcType=VARCHAR} ESCAPE '\\')
+              AND (CAST(#{author,jdbcType=VARCHAR} AS VARCHAR) IS NULL OR lower(b.author) LIKE #{author,jdbcType=VARCHAR} ESCAPE '\\')
+              AND (CAST(#{category,jdbcType=VARCHAR} AS VARCHAR) IS NULL OR lower(c.name) LIKE #{category,jdbcType=VARCHAR} ESCAPE '\\')
+            ORDER BY b.id ASC
+            LIMIT 8
+            """)
+    List<Book> searchForAssistant(@Param("title") String title, @Param("author") String author, @Param("category") String category);
 
     /**
      * 在库存足够时扣减。条件写在 WHERE 中，避免先读后写造成超卖。

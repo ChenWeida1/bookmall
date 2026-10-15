@@ -77,7 +77,24 @@ COMMENT ON COLUMN stock_hold.book_id IS '图书 ID';
 COMMENT ON COLUMN stock_hold.quantity IS '占用数量';
 COMMENT ON COLUMN stock_hold.created_at IS '占用时间，UTC';
 
+CREATE TABLE undo_log (
+    id            SERIAL       NOT NULL,
+    branch_id     BIGINT       NOT NULL,
+    xid           VARCHAR(128) NOT NULL,
+    context       VARCHAR(128) NOT NULL,
+    rollback_info BYTEA        NOT NULL,
+    log_status    INT          NOT NULL,
+    log_created   TIMESTAMP(0) NOT NULL,
+    log_modified  TIMESTAMP(0) NOT NULL,
+    CONSTRAINT pk_undo_log PRIMARY KEY (id),
+    CONSTRAINT ux_undo_log UNIQUE (xid, branch_id)
+);
+CREATE INDEX ix_log_created ON undo_log (log_created);
+COMMENT ON TABLE undo_log IS 'Seata AT 回滚日志。由订单服务在全局事务中写入。';
+
 ALTER TABLE cart_item OWNER TO bookmall_order_app;
 ALTER TABLE order_main OWNER TO bookmall_order_app;
 ALTER TABLE order_item OWNER TO bookmall_order_app;
 ALTER TABLE stock_hold OWNER TO bookmall_order_app;
+ALTER TABLE undo_log OWNER TO bookmall_order_app;
+ALTER SEQUENCE undo_log_id_seq OWNER TO bookmall_order_app;

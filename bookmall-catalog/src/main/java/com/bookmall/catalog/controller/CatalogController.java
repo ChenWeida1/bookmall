@@ -92,6 +92,17 @@ public class CatalogController {
     }
 
     /**
+     * 客服查书。不经网关，能看到下架书的价格、库存和状态。
+     */
+    @GetMapping("/internal/books/search")
+    public ApiResponse<List<Map<String, Object>>> searchForAssistant(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String author,
+            @RequestParam(required = false) String category) {
+        return ApiResponse.ok(catalogService.searchForAssistant(title, author, category));
+    }
+
+    /**
      * 扣减库存，由订单服务在下单时调用。
      *
      * @param id   图书主键

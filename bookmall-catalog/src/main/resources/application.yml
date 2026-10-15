@@ -22,3 +22,30 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+seata:
+  enabled: true
+  application-id: ${spring.application.name}
+  tx-service-group: bookmall-tx-group
+  service:
+    vgroup-mapping:
+      bookmall-tx-group: default
+    grouplist:
+      default: ${SEATA_ADDR:127.0.0.1:8091}
+  registry:
+    type: file
+  config:
+    type: file
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      export:
+        enabled: false

@@ -64,6 +64,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      ZIPKIN_EXPORT_ENABLED: "true"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_user
       SPRING_DATASOURCE_USERNAME: bookmall_user_app
       SPRING_DATASOURCE_PASSWORD: bookmall_user_dev
@@ -90,6 +91,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: bookmall_book_dev
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      SEATA_ADDR: seata:8091
+      ZIPKIN_EXPORT_ENABLED: "true"
     ports:
       - "8082:8082"
     depends_on:
@@ -98,6 +101,8 @@ services:
       redis:
         condition: service_started
       nacos:
+        condition: service_started
+      seata:
         condition: service_started
 
   order:
@@ -119,6 +124,8 @@ services:
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
+      SEATA_ADDR: seata:8091
+      ZIPKIN_EXPORT_ENABLED: "true"
     ports:
       - "8083:8083"
     depends_on:
@@ -129,6 +136,8 @@ services:
       catalog:
         condition: service_started
       nacos:
+        condition: service_started
+      seata:
         condition: service_started
 
   notification:
@@ -148,6 +157,7 @@ services:
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
+      ZIPKIN_EXPORT_ENABLED: "true"
     ports:
       - "8084:8084"
     depends_on:
@@ -169,6 +179,7 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
       BOOKMALL_NACOS_ADDR: nacos:8848
+      ZIPKIN_EXPORT_ENABLED: "true"
     ports:
       - "8080:8080"
     depends_on:
@@ -176,7 +187,60 @@ services:
       - catalog
       - order
       - notification
+      - assistant
       - nacos
+
+  assistant:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.service
+      args:
+        MODULE: bookmall-assistant
+    container_name: bookmall-assistant
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_assistant
+      SPRING_DATASOURCE_USERNAME: bookmall_assistant_app
+      SPRING_DATASOURCE_PASSWORD: bookmall_assistant_dev
+      BOOKMALL_CATALOG_BASE_URL: http://catalog:8082
+      BOOKMALL_NACOS_ADDR: nacos:8848
+      ZIPKIN_EXPORT_ENABLED: "true"
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      AI_MODEL: ${AI_MODEL:-glm-4.7}
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog:
+        condition: service_started
+      nacos:
+        condition: service_started
+
+  seata:
+    image: apache/seata-server:2.1.0
+    container_name: bookmall-seata
+    environment:
+      SEATA_PORT: "8091"
+      SEATA_STORE_DB_URL: jdbc:postgresql://postgres:5432/bookmall_seata
+      SEATA_STORE_DB_USER: bookmall_seata_app
+      SEATA_STORE_DB_PASSWORD: bookmall_seata_dev
+    volumes:
+      - ./deploy/seata/application.yml:/seata-server/resources/application.yml
+    ports:
+      - "8091:8091"
+      - "7091:7091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  zipkin:
+    image: openzipkin/zipkin:3.4
+    container_name: bookmall-zipkin
+    ports:
+      - "9411:9411"
 
 volumes:
   bookmall-pg:

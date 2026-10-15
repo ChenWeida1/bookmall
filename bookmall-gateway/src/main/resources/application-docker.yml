@@ -50,3 +50,14 @@ spring:
           uri: ${BOOKMALL_NOTIFICATION_URI:lb://bookmall-notification}
           predicates:
             - Path=/api/notifications/**
+        - id: assistant
+          uri: ${BOOKMALL_ASSISTANT_URI:lb://bookmall-assistant}
+          predicates:
+            - Path=/api/assistant/**
+
+management:
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+      export:
+        enabled: ${ZIPKIN_EXPORT_ENABLED:false}

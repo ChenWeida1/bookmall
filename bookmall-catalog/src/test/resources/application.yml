@@ -1,4 +1,7 @@
 # 图书集成测试：Redis 不可用时 BookCache 会降级读库。
+seata:
+  enabled: false
+
 bookmall:
   jwt:
     secret: bookmall-dev-jwt-secret-key-32b!

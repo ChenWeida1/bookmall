@@ -1,5 +1,7 @@
 package com.bookmall.catalog;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.bookmall.catalog.entity.Book;
 import com.bookmall.catalog.mapper.BookMapper;
 import com.bookmall.common.auth.JwtService;
 import com.bookmall.common.auth.JwtUser;
@@ -15,6 +17,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -72,6 +75,23 @@ class CatalogApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40001));
         assertEquals(before, books.selectById(1L).getStock());
+    }
+
+    /** 客服内部查询能看到下架书；三个条件都空时不返回全表。 */
+    @Test
+    void assistantSearchIncludesOffSaleAndSkipsBlankQuery() throws Exception {
+        mvc.perform(get("/internal/books/search"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.length()").value(0));
+        books.update(null, Wrappers.<Book>lambdaUpdate().set(Book::getOnSale, false).eq(Book::getId, 1L));
+        mvc.perform(get("/internal/books/search").param("title", "围城"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data[0].title").value("围城"))
+                .andExpect(jsonPath("$.data[0].status").value("OFF_SALE"))
+                .andExpect(jsonPath("$.data[0].price").exists())
+                .andExpect(jsonPath("$.data[0].stock").exists());
     }
 
     /** 空白上架状态不能当成修改成功。 */

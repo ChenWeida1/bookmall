@@ -1,0 +1,68 @@
+# Seata Server 2.1.0，文件注册，会话存在 bookmall_seata。
+# 本机与生产 systemd 用默认的 127.0.0.1。Compose / Kubernetes 用环境变量改地址。
+server:
+  port: 7091
+
+spring:
+  application:
+    name: seata-server
+
+logging:
+  config: classpath:logback-spring.xml
+  file:
+    path: ${log.home:${user.home}/logs/seata}
+
+console:
+  user:
+    username: ${SEATA_CONSOLE_USERNAME:seata}
+    password: ${SEATA_CONSOLE_PASSWORD:seata}
+
+seata:
+  config:
+    type: file
+  registry:
+    type: file
+  store:
+    mode: db
+    session:
+      mode: db
+    lock:
+      mode: db
+    db:
+      datasource: hikari
+      db-type: postgresql
+      driver-class-name: org.postgresql.Driver
+      url: ${SEATA_STORE_DB_URL:jdbc:postgresql://127.0.0.1:5432/bookmall_seata}
+      user: ${SEATA_STORE_DB_USER:bookmall_seata_app}
+      password: ${SEATA_STORE_DB_PASSWORD:bookmall_seata_dev}
+      min-conn: 5
+      max-conn: 30
+      global-table: global_table
+      branch-table: branch_table
+      lock-table: lock_table
+      distributed-lock-table: distributed_lock
+      query-limit: 1000
+      max-wait: 5000
+  server:
+    service-port: 8091
+    max-commit-retry-timeout: -1
+    max-rollback-retry-timeout: -1
+    rollback-retry-timeout-unlock-enable: false
+    enable-check-auth: true
+    retry-dead-threshold: 130000
+    xaer-nota-retry-timeout: 60000
+    recovery:
+      committing-retry-period: 1000
+      async-committing-retry-period: 1000
+      rollbacking-retry-period: 1000
+      timeout-retry-period: 1000
+    undo:
+      log-save-days: 7
+      log-delete-period: 86400000
+  security:
+    secretKey: SeataSecretKey0c382ef121d778043159209298fd40bf3850a017
+    tokenValidityInMilliseconds: 1800000
+    ignore:
+      urls: /,/**/*.css,/**/*.js,/**/*.html,/**/*.map,/**/*.svg,/**/*.png,/**/*.ico,/console-fe/public/**,/api/v1/auth/login
+  metrics:
+    enabled: false

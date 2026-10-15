@@ -49,3 +49,22 @@ spring:
           uri: http://localhost:8084
           predicates:
             - Path=/api/notifications/**
+        - id: assistant
+          uri: http://127.0.0.1:8085
+          predicates:
+            - Path=/api/assistant/**
+      httpclient:
+        response-timeout: 90s
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      export:
+        enabled: false
