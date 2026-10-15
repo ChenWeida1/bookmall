@@ -1,0 +1,53 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+
+
+
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "CatalogApplication",
+            "request": "launch",
+            "mainClass": "com.bookmall.catalog.CatalogApplication",
+            "projectName": "bookmall-catalog"
+        },
+        {
+            "type": "java",
+            "name": "GatewayApplication",
+            "request": "launch",
+            "mainClass": "com.bookmall.gateway.GatewayApplication",
+            "projectName": "bookmall-gateway"
+        },
+        {
+            "type": "java",
+            "name": "NotificationApplication",
+            "request": "launch",
+            "mainClass": "com.bookmall.notification.NotificationApplication",
+            "projectName": "bookmall-notification"
+        },
+        {
+            "type": "java",
+            "name": "OrderApplication",
+            "request": "launch",
+            "mainClass": "com.bookmall.order.OrderApplication",
+            "projectName": "bookmall-order"
+        },
+        {
+            "type": "java",
+            "name": "UserApplication",
+            "request": "launch",
+            "mainClass": "com.bookmall.user.UserApplication",
+            "projectName": "bookmall-user"
+        }
+    ]
+}
