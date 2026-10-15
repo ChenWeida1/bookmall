@@ -20,8 +20,8 @@ public interface StockChangeMapper extends BaseMapper<StockChange> {
      * @return 1 表示首次登记，0 表示该令牌已经登记过
      */
     @Insert("""
-            INSERT INTO stock_change (token, book_id, quantity, kind)
-            VALUES (#{token}, #{bookId}, #{quantity}, 1)
+            INSERT INTO stock_change (token, book_id, quantity, deducted)
+            VALUES (#{token}, #{bookId}, #{quantity}, true)
             ON CONFLICT (token) DO NOTHING
             """)
     int insertDeduct(StockChange change);
@@ -33,7 +33,7 @@ public interface StockChangeMapper extends BaseMapper<StockChange> {
      * @return 记录；令牌尚未登记时为 null
      */
     @Select("""
-            SELECT token, book_id, quantity, kind
+            SELECT token, book_id, quantity, deducted
             FROM stock_change
             WHERE token = #{token}
             FOR UPDATE
@@ -46,6 +46,6 @@ public interface StockChangeMapper extends BaseMapper<StockChange> {
      * @param token 扣减令牌
      * @return 实际更新行数
      */
-    @Update("UPDATE stock_change SET kind = 2 WHERE token = #{token} AND kind = 1")
+    @Update("UPDATE stock_change SET deducted = false WHERE token = #{token} AND deducted = true")
     int markRestored(String token);
 }

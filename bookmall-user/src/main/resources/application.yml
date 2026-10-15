@@ -6,6 +6,12 @@ spring:
     default: dev
   application:
     name: bookmall-user
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
   datasource:
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'

@@ -43,6 +43,17 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
+  # 仅 Compose 与本机开发使用。生产 systemd 与 Kubernetes 不部署注册中心。
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: bookmall-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+
   user:
     build:
       context: .
@@ -61,6 +72,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      nacos:
+        condition: service_started
 
   catalog:
     build:
@@ -84,6 +97,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      nacos:
+        condition: service_started
 
   order:
     build:
@@ -98,8 +113,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bookmall_order
       SPRING_DATASOURCE_USERNAME: bookmall_order_app
       SPRING_DATASOURCE_PASSWORD: bookmall_order_dev
-      BOOKMALL_CATALOG_BASE_URL: http://catalog:8082
       BOOKMALL_NOTIFICATION_BASE_URL: http://notification:8084
+      BOOKMALL_NACOS_ADDR: nacos:8848
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: guest
@@ -112,6 +127,8 @@ services:
       rabbitmq:
         condition: service_started
       catalog:
+        condition: service_started
+      nacos:
         condition: service_started
 
   notification:
@@ -138,6 +155,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_started
+      nacos:
+        condition: service_started
 
   gateway:
     build:
@@ -149,10 +168,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       BOOKMALL_JWT_SECRET: bookmall-dev-jwt-secret-key-32b!
-      BOOKMALL_USER_URI: http://user:8081
-      BOOKMALL_CATALOG_URI: http://catalog:8082
-      BOOKMALL_ORDER_URI: http://order:8083
-      BOOKMALL_NOTIFICATION_URI: http://notification:8084
+      BOOKMALL_NACOS_ADDR: nacos:8848
     ports:
       - "8080:8080"
     depends_on:
@@ -160,6 +176,7 @@ services:
       - catalog
       - order
       - notification
+      - nacos
 
 volumes:
   bookmall-pg:

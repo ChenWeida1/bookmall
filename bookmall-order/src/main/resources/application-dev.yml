@@ -1,11 +1,16 @@
 bookmall:
   jwt:
     secret: bookmall-dev-jwt-secret-key-32b!
-  catalog-base-url: http://localhost:8082
+  catalog-base-url: ${BOOKMALL_CATALOG_BASE_URL:}
   notification-base-url: http://localhost:8084
   pay-timeout: 1m
 
 spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: localhost:8848
   rabbitmq:
     host: localhost
     port: 5672

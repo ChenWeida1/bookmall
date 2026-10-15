@@ -2,6 +2,12 @@
   <main class="page">
     <h1>我的订单</h1>
     <p class="muted">仅显示当前用户订单，按创建时间倒序。待支付订单可支付或取消。</p>
+    <p>
+      <button class="ghost" :disabled="status === ''" @click="choose('')">全部</button>
+      <button class="ghost" :disabled="status === 'PENDING_PAY'" @click="choose('PENDING_PAY')">待支付</button>
+      <button class="ghost" :disabled="status === 'PAID'" @click="choose('PAID')">已支付</button>
+      <button class="ghost" :disabled="status === 'CANCELLED'" @click="choose('CANCELLED')">已取消</button>
+    </p>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="message" class="muted">{{ message }}</p>
     <p v-if="!ready" class="muted">加载中</p>
@@ -19,6 +25,13 @@
           <td>{{ order.itemCount }}</td>
           <td>
             <router-link :to="`/orders/${order.id}`">查看详情</router-link>
+            <button
+              v-if="order.status === 'PENDING_PAY'"
+              class="ghost"
+              style="margin-left: 8px"
+              :disabled="busyId === order.id"
+              @click="pay(order)"
+            >支付</button>
             <button
               v-if="order.status === 'PENDING_PAY'"
               class="ghost"
@@ -42,10 +55,22 @@ const error = ref('')
 const message = ref('')
 const ready = ref(false)
 const busyId = ref(null)
+const status = ref('')
 
 async function load() {
-  const data = await api('/api/orders')
+  const query = status.value ? '?status=' + status.value : ''
+  const data = await api('/api/orders' + query)
   orders.value = data.items
+}
+
+async function choose(next) {
+  status.value = next
+  error.value = ''
+  try {
+    await load()
+  } catch (ex) {
+    error.value = ex.message
+  }
 }
 
 onMounted(async () => {
@@ -57,6 +82,21 @@ onMounted(async () => {
     ready.value = true
   }
 })
+
+async function pay(order) {
+  error.value = ''
+  message.value = ''
+  busyId.value = order.id
+  try {
+    await api('/api/orders/' + order.id + '/pay', { method: 'POST' })
+    message.value = '订单已支付'
+    await load()
+  } catch (ex) {
+    error.value = ex.message
+  } finally {
+    busyId.value = null
+  }
+}
 
 async function cancel(order) {
   error.value = ''

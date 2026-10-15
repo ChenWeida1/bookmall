@@ -437,14 +437,19 @@ public class OrderService {
      * @param userId 当前用户
      * @param page   页码，缺省 1
      * @param size   每页条数，缺省 10
+     * @param status 可选，PENDING_PAY / PAID / CANCELLED；空表示全部
      * @return 订单摘要分页
      */
-    public PageResult<Map<String, Object>> list(long userId, Integer page, Integer size) {
+    public PageResult<Map<String, Object>> list(long userId, Integer page, Integer size, String status) {
         PageQuery query = PageQuery.of(page, size);
-        Page<OrderMain> result = orders.selectPage(new Page<>(query.page(), query.size()),
-                Wrappers.<OrderMain>lambdaQuery()
-                        .eq(OrderMain::getUserId, userId)
-                        .orderByDesc(OrderMain::getCreatedAt));
+        Short statusCode = parseStatusFilter(status);
+        var wrapper = Wrappers.<OrderMain>lambdaQuery()
+                .eq(OrderMain::getUserId, userId);
+        if (statusCode != null) {
+            wrapper.eq(OrderMain::getStatus, statusCode);
+        }
+        wrapper.orderByDesc(OrderMain::getCreatedAt);
+        Page<OrderMain> result = orders.selectPage(new Page<>(query.page(), query.size()), wrapper);
         List<Long> ids = result.getRecords().stream().map(OrderMain::getId).toList();
         Map<Long, Integer> counts = new LinkedHashMap<>();
         if (!ids.isEmpty()) {
@@ -458,6 +463,54 @@ public class OrderService {
             return row;
         }).toList();
         return new PageResult<>(query.page(), query.size(), result.getTotal(), rows);
+    }
+
+    /**
+     * 管理员分页查看全部用户的订单。摘要比读者列表多一个 userId。
+     */
+    public PageResult<Map<String, Object>> adminList(Integer page, Integer size, String status) {
+        PageQuery query = PageQuery.of(page, size);
+        Short statusCode = parseStatusFilter(status);
+        var wrapper = Wrappers.<OrderMain>lambdaQuery();
+        if (statusCode != null) {
+            wrapper.eq(OrderMain::getStatus, statusCode);
+        }
+        wrapper.orderByDesc(OrderMain::getCreatedAt);
+        Page<OrderMain> result = orders.selectPage(new Page<>(query.page(), query.size()), wrapper);
+        List<Map<String, Object>> rows = result.getRecords().stream().map(order -> {
+            Map<String, Object> row = header(order);
+            row.put("userId", order.getUserId());
+            return row;
+        }).toList();
+        return new PageResult<>(query.page(), query.size(), result.getTotal(), rows);
+    }
+
+    /**
+     * 管理员查看任意用户的订单详情。不存在返回 404。
+     */
+    public Map<String, Object> adminDetail(long orderId) {
+        OrderMain order = orders.selectById(orderId);
+        if (order == null) {
+            throw BusinessException.notFound("订单不存在");
+        }
+        Map<String, Object> view = detailView(order, items.selectList(Wrappers.<OrderItem>lambdaQuery()
+                .eq(OrderItem::getOrderId, order.getId())
+                .orderByAsc(OrderItem::getId)));
+        view.put("userId", order.getUserId());
+        return view;
+    }
+
+    /** 空状态表示不筛选。非法取值返回 40001。 */
+    private static Short parseStatusFilter(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        return switch (status.trim()) {
+            case "PENDING_PAY" -> OrderMain.PENDING_PAY;
+            case "CANCELLED" -> OrderMain.CANCELLED;
+            case "PAID" -> OrderMain.PAID;
+            default -> throw BusinessException.badRequest("参数不合法");
+        };
     }
 
     /**

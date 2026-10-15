@@ -108,7 +108,7 @@ public class CatalogService {
         Map<String, Object> item = listItem(book);
         item.put("description", book.getDescription());
         item.put("isbn", null);
-        item.put("status", Book.statusName(book.getStatus()));
+        item.put("status", Book.statusName(book.getOnSale()));
         return item;
     }
 
@@ -167,7 +167,7 @@ public class CatalogService {
         if (!existing.getBookId().equals(id) || existing.getQuantity() != qty) {
             throw new BusinessException(500, 50000, "服务器内部错误");
         }
-        if (existing.getKind() != null && existing.getKind() == StockChange.RESTORED) {
+        if (Boolean.FALSE.equals(existing.getDeducted())) {
             return;
         }
         if (books.restore(id, qty) != 1) {
@@ -213,18 +213,18 @@ public class CatalogService {
         if (!statusProvided && stock == null) {
             throw BusinessException.badRequest("参数不合法");
         }
-        Short status = null;
+        Boolean onSale = null;
         if (statusProvided) {
             if (statusName.isBlank()) {
                 throw BusinessException.badRequest("参数不合法");
             }
-            status = parseStatus(statusName);
+            onSale = parseStatus(statusName);
         }
         if (stock != null && stock < 0) {
             throw BusinessException.badRequest("参数不合法");
         }
-        if (status != null) {
-            books.updateStatus(id, status);
+        if (onSale != null) {
+            books.updateStatus(id, onSale);
         }
         if (stock != null && books.updateStock(id, stock) != 1) {
             throw BusinessException.notFound("图书不存在");
@@ -251,14 +251,14 @@ public class CatalogService {
         });
     }
 
-    /** 接受 ON_SALE/OFF_SALE 或 1/0。 */
-    private static short parseStatus(String raw) {
+    /** 接受 ON_SALE/OFF_SALE 或 1/0。库里存布尔值。 */
+    private static boolean parseStatus(String raw) {
         String value = raw.trim();
         if ("ON_SALE".equalsIgnoreCase(value) || "1".equals(value)) {
-            return Book.ON_SALE;
+            return true;
         }
         if ("OFF_SALE".equalsIgnoreCase(value) || "0".equals(value)) {
-            return Book.OFF_SALE;
+            return false;
         }
         throw BusinessException.badRequest("参数不合法");
     }
@@ -300,8 +300,7 @@ public class CatalogService {
         if (existing == null
                 || !existing.getBookId().equals(id)
                 || existing.getQuantity() != quantity
-                || existing.getKind() == null
-                || existing.getKind() != StockChange.DEDUCTED) {
+                || !Boolean.TRUE.equals(existing.getDeducted())) {
             throw new BusinessException(500, 50000, "服务器内部错误");
         }
         return stockView(id);

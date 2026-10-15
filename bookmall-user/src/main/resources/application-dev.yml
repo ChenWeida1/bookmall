@@ -3,6 +3,11 @@ bookmall:
     secret: bookmall-dev-jwt-secret-key-32b!
 
 spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: localhost:8848
   datasource:
     url: jdbc:postgresql://localhost:5432/bookmall_user
     username: bookmall_user_app

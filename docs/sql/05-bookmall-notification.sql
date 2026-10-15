@@ -7,9 +7,8 @@ CREATE TABLE notification (
     user_id    bigint       NOT NULL,
     title      varchar(64)  NOT NULL,
     content    varchar(255) NOT NULL,
-    read_flag  smallint     NOT NULL DEFAULT 0,
-    created_at timestamptz  NOT NULL DEFAULT now(),
-    CONSTRAINT ck_notification_read_flag CHECK (read_flag IN (0, 1))
+    read_flag  boolean      NOT NULL DEFAULT false,
+    created_at timestamptz  NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_notification_user_created ON notification (user_id, created_at DESC);
@@ -19,7 +18,7 @@ COMMENT ON COLUMN notification.id IS '通知 ID';
 COMMENT ON COLUMN notification.user_id IS '接收通知的用户 ID。逻辑引用用户库，不建外键';
 COMMENT ON COLUMN notification.title IS '通知标题';
 COMMENT ON COLUMN notification.content IS '通知正文';
-COMMENT ON COLUMN notification.read_flag IS '已读标记：0=未读，1=已读';
+COMMENT ON COLUMN notification.read_flag IS '是否已读。true=已读，false=未读';
 COMMENT ON COLUMN notification.created_at IS '通知创建时间，UTC';
 
 ALTER TABLE notification OWNER TO bookmall_notification_app;

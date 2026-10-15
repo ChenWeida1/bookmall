@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Bean;
  * 扫描 {@code com.bookmall} 以加载公共模块的全局异常处理。
  */
 @SpringBootApplication(scanBasePackages = "com.bookmall")
+@EnableFeignClients(basePackages = "com.bookmall.order.client")
 public class OrderApplication {
 
     /** 启动订单服务。 */

@@ -10,6 +10,8 @@ import Orders from './views/Orders.vue'
 import OrderDetail from './views/OrderDetail.vue'
 import Notifications from './views/Notifications.vue'
 import AdminBooks from './views/AdminBooks.vue'
+import AdminOrders from './views/AdminOrders.vue'
+import AdminDeadLetters from './views/AdminDeadLetters.vue'
 import { isAdmin } from './api'
 
 const router = createRouter({
@@ -25,7 +27,9 @@ const router = createRouter({
     { path: '/orders/:id', component: OrderDetail, meta: { auth: true } },
     { path: '/notifications', component: Notifications, meta: { auth: true } },
     // 管理端：需登录且 role=ADMIN
-    { path: '/admin/books', component: AdminBooks, meta: { auth: true, admin: true } }
+    { path: '/admin/books', component: AdminBooks, meta: { auth: true, admin: true } },
+    { path: '/admin/orders', component: AdminOrders, meta: { auth: true, admin: true } },
+    { path: '/admin/dead-letters', component: AdminDeadLetters, meta: { auth: true, admin: true } }
   ]
 })
 

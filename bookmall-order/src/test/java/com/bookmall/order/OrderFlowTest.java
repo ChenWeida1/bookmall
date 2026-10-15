@@ -251,6 +251,23 @@ class OrderFlowTest {
         verify(catalog, org.mockito.Mockito.times(1)).restoreQuantity(anyLong(), anyInt());
     }
 
+    /** 按状态筛选只返回本人订单。非法状态是 40001。 */
+    @Test
+    void listFiltersOnlyOwnOrders() {
+        saveCart(910051L, 1L, 1);
+        when(catalog.getBook(1L)).thenReturn(book(1, 5));
+        var created = orders.create(910051L, null);
+        long id = ((Number) created.get("id")).longValue();
+        assertTrue(orders.list(910051L, 1, 10, "PENDING_PAY").getItems().stream()
+                .anyMatch(row -> id == ((Number) row.get("id")).longValue()));
+        assertTrue(orders.list(910051L, 1, 10, "PAID").getItems().stream()
+                .noneMatch(row -> id == ((Number) row.get("id")).longValue()));
+        assertTrue(orders.list(910052L, 1, 10, null).getItems().stream()
+                .noneMatch(row -> id == ((Number) row.get("id")).longValue()));
+        assertEquals(40001, assertThrows(BusinessException.class,
+                () -> orders.list(910051L, 1, 10, "SHIPPED")).getCode());
+    }
+
     /** 写入一条测试用购物车记录。 */
     private void saveCart(long userId, long bookId, int quantity) {
         CartItem item = new CartItem();

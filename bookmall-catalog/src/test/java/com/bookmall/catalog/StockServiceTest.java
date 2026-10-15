@@ -79,12 +79,12 @@ class StockServiceTest {
     @Test
     void blankStatusDoesNotUpdateBook() {
         var book = books.selectById(1L);
-        short status = book.getStatus();
+        Boolean onSale = book.getOnSale();
         int stock = book.getStock();
         BusinessException ex = assertThrows(BusinessException.class, () -> catalog.adminUpdate(1L, "  ", null));
         assertEquals(40001, ex.getCode());
         var after = books.selectById(1L);
-        assertEquals(status, after.getStatus());
+        assertEquals(onSale, after.getOnSale());
         assertEquals(stock, after.getStock());
     }
 

@@ -17,11 +17,10 @@ CREATE TABLE book (
     price       numeric(10, 2) NOT NULL,
     stock       integer        NOT NULL,
     description text,
-    status      smallint       NOT NULL,
+    on_sale     boolean        NOT NULL,
     CONSTRAINT fk_book_category FOREIGN KEY (category_id) REFERENCES category (id),
     CONSTRAINT ck_book_price_nonneg CHECK (price >= 0),
-    CONSTRAINT ck_book_stock_nonneg CHECK (stock >= 0),
-    CONSTRAINT ck_book_status CHECK (status IN (0, 1))
+    CONSTRAINT ck_book_stock_nonneg CHECK (stock >= 0)
 );
 
 CREATE INDEX idx_book_category_id ON book (category_id);
@@ -40,23 +39,22 @@ COMMENT ON COLUMN book.cover_url IS '封面图片地址，可空';
 COMMENT ON COLUMN book.price IS '单价，单位元，最多两位小数';
 COMMENT ON COLUMN book.stock IS '可售库存，必须大于等于 0。扣减时须满足 stock >= 扣减数量';
 COMMENT ON COLUMN book.description IS '简介，可空';
-COMMENT ON COLUMN book.status IS '上架状态：1=在售，0=下架';
+COMMENT ON COLUMN book.on_sale IS '是否在售。true=在售，false=下架';
 
 CREATE TABLE stock_change (
     token      varchar(64) PRIMARY KEY,
     book_id    bigint   NOT NULL,
     quantity   integer  NOT NULL,
-    kind       smallint NOT NULL,
+    deducted   boolean  NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT ck_stock_change_quantity_pos CHECK (quantity > 0),
-    CONSTRAINT ck_stock_change_kind CHECK (kind IN (1, 2))
+    CONSTRAINT ck_stock_change_quantity_pos CHECK (quantity > 0)
 );
 
 COMMENT ON TABLE stock_change IS '库存扣减与回补的幂等记录。同一 token 只扣一次、只回补一次。';
 COMMENT ON COLUMN stock_change.token IS '一次扣减的令牌，由订单服务生成';
 COMMENT ON COLUMN stock_change.book_id IS '图书 ID';
 COMMENT ON COLUMN stock_change.quantity IS '本次变更数量';
-COMMENT ON COLUMN stock_change.kind IS '1=已扣减，2=已回补';
+COMMENT ON COLUMN stock_change.deducted IS 'true=已扣减，false=已回补';
 COMMENT ON COLUMN stock_change.created_at IS '首次记录时间，UTC';
 
 ALTER TABLE category OWNER TO bookmall_book_app;

@@ -7,6 +7,11 @@ bookmall:
     secret: ${BOOKMALL_JWT_SECRET}
 
 spring:
+  cloud:
+    nacos:
+      discovery:
+        enabled: ${BOOKMALL_NACOS_ENABLED:true}
+        server-addr: ${BOOKMALL_NACOS_ADDR:nacos:8848}
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:rabbitmq}
     port: ${SPRING_RABBITMQ_PORT:5672}

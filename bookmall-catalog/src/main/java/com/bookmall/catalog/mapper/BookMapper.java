@@ -27,10 +27,10 @@ public interface BookMapper extends BaseMapper<Book> {
      */
     @Select("""
             SELECT b.id, b.category_id, b.title, b.author, b.cover_url, b.price,
-                   b.stock, b.description, b.status, c.name AS category_name
+                   b.stock, b.description, b.on_sale, c.name AS category_name
             FROM book b
             INNER JOIN category c ON c.id = b.category_id
-            WHERE b.status = 1
+            WHERE b.on_sale = true
               AND (CAST(#{categoryId,jdbcType=BIGINT} AS BIGINT) IS NULL OR b.category_id = #{categoryId,jdbcType=BIGINT})
               AND (CAST(#{keyword,jdbcType=VARCHAR} AS VARCHAR) IS NULL OR lower(b.title) LIKE #{keyword,jdbcType=VARCHAR} ESCAPE '\\')
             ORDER BY b.id ASC
@@ -61,11 +61,11 @@ public interface BookMapper extends BaseMapper<Book> {
      * 管理端改上下架状态。
      *
      * @param id     图书主键
-     * @param status 1 在售 / 0 下架
+     * @param onSale true 在售 / false 下架
      * @return 更新行数
      */
-    @Update("UPDATE book SET status = #{status} WHERE id = #{id}")
-    int updateStatus(@Param("id") long id, @Param("status") short status);
+    @Update("UPDATE book SET on_sale = #{onSale} WHERE id = #{id}")
+    int updateStatus(@Param("id") long id, @Param("onSale") boolean onSale);
 
     /**
      * 管理端直接改库存（覆盖写）。

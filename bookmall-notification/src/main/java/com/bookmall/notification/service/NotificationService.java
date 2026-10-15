@@ -52,7 +52,7 @@ public class NotificationService {
         if (notification == null) {
             throw BusinessException.notFound("通知不存在");
         }
-        notification.setReadFlag((short) 1);
+        notification.setReadFlag(true);
         notifications.updateById(notification);
         return view(notification);
     }
@@ -89,7 +89,7 @@ public class NotificationService {
         notification.setUserId(userId);
         notification.setTitle(safeTitle);
         notification.setContent(safeContent);
-        notification.setReadFlag((short) 0);
+        notification.setReadFlag(false);
         notification.setBizKey(safeBizKey);
         try {
             notifications.insert(notification);
@@ -111,13 +111,13 @@ public class NotificationService {
         return body;
     }
 
-    /** 用户可见字段。readFlag 为 1 时 read 为 true。 */
+    /** 用户可见字段。readFlag 为 true 时 read 为 true。 */
     private Map<String, Object> view(Notification notification) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", notification.getId());
         row.put("title", notification.getTitle());
         row.put("content", notification.getContent());
-        row.put("read", notification.getReadFlag() != null && notification.getReadFlag() == 1);
+        row.put("read", Boolean.TRUE.equals(notification.getReadFlag()));
         row.put("createdAt", Texts.time(notification.getCreatedAt()));
         return row;
     }

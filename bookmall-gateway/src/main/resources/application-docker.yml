@@ -8,6 +8,10 @@ bookmall:
 
 spring:
   cloud:
+    nacos:
+      discovery:
+        enabled: ${BOOKMALL_NACOS_ENABLED:true}
+        server-addr: ${BOOKMALL_NACOS_ADDR:nacos:8848}
     gateway:
       globalcors:
         add-to-simple-url-handler-mapping: true
@@ -19,22 +23,30 @@ spring:
             allowCredentials: true
       routes:
         - id: users
-          uri: ${BOOKMALL_USER_URI:http://user:8081}
+          uri: ${BOOKMALL_USER_URI:lb://bookmall-user}
           predicates:
             - Path=/api/users/**
         - id: catalog
-          uri: ${BOOKMALL_CATALOG_URI:http://catalog:8082}
+          uri: ${BOOKMALL_CATALOG_URI:lb://bookmall-catalog}
           predicates:
             - Path=/api/categories,/api/books/**
+        - id: admin-orders
+          uri: ${BOOKMALL_ORDER_URI:lb://bookmall-order}
+          predicates:
+            - Path=/api/admin/orders/**
+        - id: admin-notifications
+          uri: ${BOOKMALL_NOTIFICATION_URI:lb://bookmall-notification}
+          predicates:
+            - Path=/api/admin/notifications/**
         - id: catalog-admin
-          uri: ${BOOKMALL_CATALOG_URI:http://catalog:8082}
+          uri: ${BOOKMALL_CATALOG_URI:lb://bookmall-catalog}
           predicates:
             - Path=/api/admin/**
         - id: orders
-          uri: ${BOOKMALL_ORDER_URI:http://order:8083}
+          uri: ${BOOKMALL_ORDER_URI:lb://bookmall-order}
           predicates:
             - Path=/api/cart/**,/api/orders/**
         - id: notifications
-          uri: ${BOOKMALL_NOTIFICATION_URI:http://notification:8084}
+          uri: ${BOOKMALL_NOTIFICATION_URI:lb://bookmall-notification}
           predicates:
             - Path=/api/notifications/**

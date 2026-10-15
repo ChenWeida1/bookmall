@@ -3,37 +3,28 @@ package com.bookmall.order.client;
 import com.bookmall.common.error.BusinessException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import feign.FeignException;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 
 /**
  * 调用目录服务查询图书、扣减库存和回补库存。
  * <p>
- * 连接和读取超时都是 3 秒。目录返回的业务错误码会转成本服务的 {@link BusinessException}，
- * 这样订单接口仍使用统一的错误结构。回补按 token 幂等，失败时向外抛出，不能假装库存已经加回。
+ * HTTP 由 {@link CatalogFeign} 发出，超时 3 秒。目录返回的业务错误码会转成本服务的 {@link BusinessException}。
+ * 回补按 token 幂等，失败时向外抛出，不能假装库存已经加回。
  */
 @Component
+@RequiredArgsConstructor
 public class CatalogClient {
 
     private static final Logger log = LoggerFactory.getLogger(CatalogClient.class);
 
-    private final RestClient client;
+    private final CatalogFeign catalog;
     private final ObjectMapper objectMapper;
-
-    /**
-     * @param baseUrl      目录服务根地址，配置项 {@code bookmall.catalog-base-url}
-     * @param objectMapper JSON 读写
-     */
-    public CatalogClient(@Value("${bookmall.catalog-base-url}") String baseUrl, ObjectMapper objectMapper) {
-        this.client = restClient(baseUrl, 3000);
-        this.objectMapper = objectMapper;
-    }
 
     /**
      * 查询一本图书的展示和库存快照。目录返回 40400 时视为图书不存在，不抛异常。
@@ -42,7 +33,7 @@ public class CatalogClient {
      * @return 存在时带价格、库存和上架状态；不存在时 {@code exists} 为 false
      */
     public BookSnapshot getBook(long bookId) {
-        JsonNode body = exchange("GET", "/api/books/" + bookId, null);
+        JsonNode body = call(() -> catalog.book(bookId));
         if (body.path("code").asInt() == 40400) {
             return BookSnapshot.missing(bookId);
         }
@@ -68,8 +59,7 @@ public class CatalogClient {
      * @param token    本轮扣减令牌，重复调用不会再次扣减
      */
     public void deduct(long bookId, int quantity, String token) {
-        JsonNode body = exchange("POST", "/internal/books/" + bookId + "/stock/deduct",
-                objectMapper.createObjectNode().put("quantity", quantity).put("token", token));
+        JsonNode body = call(() -> catalog.deduct(bookId, new CatalogFeign.StockBody(quantity, token)));
         int code = body.path("code").asInt(-1);
         if (code == 0) {
             return;
@@ -94,8 +84,7 @@ public class CatalogClient {
         RuntimeException last = null;
         for (int attempt = 0; attempt < 3; attempt++) {
             try {
-                JsonNode body = exchange("POST", "/internal/books/" + bookId + "/stock/restore",
-                        objectMapper.createObjectNode().put("quantity", quantity).put("token", token));
+                JsonNode body = call(() -> catalog.restore(bookId, new CatalogFeign.StockBody(quantity, token)));
                 int code = body.path("code").asInt(-1);
                 if (code == 0) {
                     return;
@@ -121,8 +110,7 @@ public class CatalogClient {
      * 订单取消时按数量还库存，不带扣减令牌。
      */
     public void restoreQuantity(long bookId, int quantity) {
-        JsonNode body = exchange("POST", "/internal/books/" + bookId + "/stock/restore-qty",
-                objectMapper.createObjectNode().put("quantity", quantity));
+        JsonNode body = call(() -> catalog.restoreQuantity(bookId, new CatalogFeign.QuantityBody(quantity)));
         int code = body.path("code").asInt(-1);
         if (code == 0) {
             return;
@@ -133,18 +121,15 @@ public class CatalogClient {
         throw new BusinessException(500, 50000, "服务器内部错误");
     }
 
-    /**
-     * 发起一次 HTTP 调用并解析 JSON。HTTP 4xx/5xx 若带响应体，仍按业务响应解析。
-     */
-    private JsonNode exchange(String method, String path, JsonNode json) {
+    /** Feign 在 HTTP 4xx/5xx 时抛异常，这里把响应体还原成业务 JSON。 */
+    private JsonNode call(java.util.function.Supplier<JsonNode> action) {
         try {
-            RestClient.RequestBodySpec spec = client.method(org.springframework.http.HttpMethod.valueOf(method)).uri(path);
-            RestClient.ResponseSpec response = json == null ? spec.retrieve() : spec.body(json).retrieve();
-            String raw = response.body(String.class);
-            return objectMapper.readTree(raw == null ? "{}" : raw);
-        } catch (org.springframework.web.client.RestClientResponseException ex) {
+            JsonNode body = action.get();
+            return body == null ? objectMapper.createObjectNode() : body;
+        } catch (FeignException ex) {
             try {
-                return objectMapper.readTree(ex.getResponseBodyAsString());
+                String raw = ex.contentUTF8();
+                return objectMapper.readTree(raw == null || raw.isBlank() ? "{}" : raw);
             } catch (Exception parse) {
                 throw new BusinessException(500, 50000, "服务器内部错误");
             }
@@ -153,14 +138,6 @@ public class CatalogClient {
         } catch (Exception ex) {
             throw new BusinessException(500, 50000, "服务器内部错误");
         }
-    }
-
-    /** 创建带连接和读取超时的客户端。 */
-    private static RestClient restClient(String baseUrl, int timeoutMs) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(timeoutMs);
-        factory.setReadTimeout(timeoutMs);
-        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
     }
 
     /**

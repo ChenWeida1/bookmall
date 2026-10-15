@@ -12,20 +12,14 @@ import java.math.BigDecimal;
 /**
  * 图书，对应表 {@code book}。
  * <p>
- * 上架状态用数字保存：{@link #ON_SALE} 为在售，{@link #OFF_SALE} 为下架。
- * 列表只返回在售图书；详情仍可查到下架书，并在 {@code status} 中标明。
+ * 上架状态用布尔列 {@code on_sale} 保存：true 为在售，false 为下架。
+ * 列表只返回在售图书；详情仍可查到下架书，并在 {@code status} 中标明 ON_SALE / OFF_SALE。
  * {@code categoryName} 不在本表，由查询时关联 {@code category} 填入。
  */
 @Getter
 @Setter
 @TableName("book")
 public class Book {
-
-    /** 在售。 */
-    public static final short ON_SALE = 1;
-
-    /** 下架。 */
-    public static final short OFF_SALE = 0;
 
     /** 主键，数据库自增。 */
     @TableId(type = IdType.AUTO)
@@ -56,16 +50,16 @@ public class Book {
     /** 图书简介，仅详情接口返回。 */
     private String description;
 
-    /** 上架状态，取值为 {@link #ON_SALE} 或 {@link #OFF_SALE}。 */
-    private Short status;
+    /** 是否在售。true 在售，false 下架。 */
+    private Boolean onSale;
 
     /**
-     * 把库中的状态数字转成接口使用的枚举名。
+     * 把库中的上架布尔值转成接口使用的枚举名。
      *
-     * @param status {@link #ON_SALE} 或 {@link #OFF_SALE}
+     * @param onSale true 在售，false 下架
      * @return {@code ON_SALE} 或 {@code OFF_SALE}
      */
-    public static String statusName(Short status) {
-        return status != null && status == ON_SALE ? "ON_SALE" : "OFF_SALE";
+    public static String statusName(Boolean onSale) {
+        return Boolean.TRUE.equals(onSale) ? "ON_SALE" : "OFF_SALE";
     }
 }

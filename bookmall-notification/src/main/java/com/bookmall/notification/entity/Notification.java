@@ -13,7 +13,7 @@ import java.time.OffsetDateTime;
 /**
  * 站内通知，对应表 {@code notification}。
  * <p>
- * 已读标记用数字保存：0 未读，1 已读。接口对外把该数字转成布尔值 {@code read}。
+ * 已读标记用布尔列 {@code read_flag} 保存。接口对外字段仍是 {@code read}。
  * {@code createdAt} 在插入时由 {@link com.bookmall.notification.config.CreatedAtFillHandler} 写成 UTC。
  */
 @Getter
@@ -34,8 +34,8 @@ public class Notification {
     /** 通知正文，最长 255。 */
     private String content;
 
-    /** 已读标记：0 未读，1 已读。 */
-    private Short readFlag;
+    /** 是否已读。true 已读，false 未读。 */
+    private Boolean readFlag;
 
     /**
      * 业务幂等键，例如 ORDER_CREATED:订单号。

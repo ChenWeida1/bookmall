@@ -21,6 +21,8 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: docker
+            - name: BOOKMALL_NACOS_ENABLED
+              value: "false"
             - name: BOOKMALL_JWT_SECRET
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_JWT_SECRET } }
             - name: SPRING_DATASOURCE_URL
@@ -60,6 +62,8 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: docker
+            - name: BOOKMALL_NACOS_ENABLED
+              value: "false"
             - name: BOOKMALL_JWT_SECRET
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_JWT_SECRET } }
             - name: SPRING_DATASOURCE_URL
@@ -103,6 +107,8 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: docker
+            - name: BOOKMALL_NACOS_ENABLED
+              value: "false"
             - name: BOOKMALL_JWT_SECRET
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_JWT_SECRET } }
             - name: SPRING_DATASOURCE_URL
@@ -152,6 +158,8 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: docker
+            - name: BOOKMALL_NACOS_ENABLED
+              value: "false"
             - name: BOOKMALL_JWT_SECRET
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_JWT_SECRET } }
             - name: SPRING_DATASOURCE_URL
@@ -197,6 +205,8 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: docker
+            - name: BOOKMALL_NACOS_ENABLED
+              value: "false"
             - name: BOOKMALL_JWT_SECRET
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_JWT_SECRET } }
             - name: BOOKMALL_USER_URI

@@ -4,7 +4,40 @@ bookmall:
 
 spring:
   cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: localhost:8848
     gateway:
+      routes:
+        - id: users
+          uri: lb://bookmall-user
+          predicates:
+            - Path=/api/users/**
+        - id: catalog
+          uri: lb://bookmall-catalog
+          predicates:
+            - Path=/api/categories,/api/books/**
+        - id: admin-orders
+          uri: lb://bookmall-order
+          predicates:
+            - Path=/api/admin/orders/**
+        - id: admin-notifications
+          uri: lb://bookmall-notification
+          predicates:
+            - Path=/api/admin/notifications/**
+        - id: catalog-admin
+          uri: lb://bookmall-catalog
+          predicates:
+            - Path=/api/admin/**
+        - id: orders
+          uri: lb://bookmall-order
+          predicates:
+            - Path=/api/cart/**,/api/orders/**
+        - id: notifications
+          uri: lb://bookmall-notification
+          predicates:
+            - Path=/api/notifications/**
       globalcors:
         cors-configurations:
           '[/**]':

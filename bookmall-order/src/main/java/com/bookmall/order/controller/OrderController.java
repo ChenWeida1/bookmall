@@ -106,8 +106,9 @@ public class OrderController {
     @GetMapping("/api/orders")
     public ApiResponse<PageResult<Map<String, Object>>> orders(HttpServletRequest request,
                                                                @RequestParam(required = false) Integer page,
-                                                               @RequestParam(required = false) Integer size) {
-        return ApiResponse.ok(orderService.list(JwtAuthFilter.userId(request), page, size));
+                                                               @RequestParam(required = false) Integer size,
+                                                               @RequestParam(required = false) String status) {
+        return ApiResponse.ok(orderService.list(JwtAuthFilter.userId(request), page, size, status));
     }
 
     /**
