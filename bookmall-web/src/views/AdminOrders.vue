@@ -1,87 +1,106 @@
 <template>
-  <main class="page">
+  <div>
     <h1>订单管理</h1>
-    <p class="muted">管理员只读。可按状态筛选，不能在这里支付或取消。</p>
-    <p>
-      <button class="ghost" :disabled="status === ''" @click="choose('')">全部</button>
-      <button class="ghost" :disabled="status === 'PENDING_PAY'" @click="choose('PENDING_PAY')">待支付</button>
-      <button class="ghost" :disabled="status === 'PAID'" @click="choose('PAID')">已支付</button>
-      <button class="ghost" :disabled="status === 'CANCELLED'" @click="choose('CANCELLED')">已取消</button>
-    </p>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="!ready" class="muted">加载中</p>
-    <p v-else-if="!orders.length && !error" class="muted">没有订单</p>
-    <table v-else>
-      <thead>
-        <tr><th>用户</th><th>订单号</th><th>总金额</th><th>状态</th><th>创建时间</th><th></th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="order in orders" :key="order.id">
-          <td>{{ order.userId }}</td>
-          <td>{{ order.orderNo }}</td>
-          <td class="price">¥{{ order.totalAmount }}</td>
-          <td><span class="badge">{{ statusLabel(order.status) }}</span></td>
-          <td>{{ formatTime(order.createdAt) }}</td>
-          <td><button class="ghost" @click="open(order)">详情</button></td>
-        </tr>
-      </tbody>
-    </table>
-    <section v-if="detail" class="card" style="padding: 16px; margin-top: 16px">
+    <p>管理员只读。可按状态筛选，不能在这里支付或取消。</p>
+    <div ref="chartEl" style="height: 280px"></div>
+    <el-radio-group v-model="status" @change="choose">
+      <el-radio-button value="">全部</el-radio-button>
+      <el-radio-button value="PENDING_PAY">待支付</el-radio-button>
+      <el-radio-button value="PAID">已支付</el-radio-button>
+      <el-radio-button value="CANCELLED">已取消</el-radio-button>
+    </el-radio-group>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
+    <el-skeleton v-if="!ready" :rows="3" animated />
+    <el-empty v-else-if="!orders.length && !error" description="没有订单" />
+    <el-table v-else :data="orders">
+      <el-table-column prop="userId" label="用户" />
+      <el-table-column prop="orderNo" label="订单号" />
+      <el-table-column label="总金额"><template #default="{ row }">¥{{ row.totalAmount }}</template></el-table-column>
+      <el-table-column label="状态"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
+      <el-table-column label="创建时间"><template #default="{ row }">{{ formatTime(row.createdAt) }}</template></el-table-column>
+      <el-table-column label=""><template #default="{ row }"><el-button @click="open(row)">详情</el-button></template></el-table-column>
+    </el-table>
+    <el-card v-if="detail" style="margin-top: 16px">
       <p>订单号：{{ detail.orderNo }}</p>
       <p>用户：{{ detail.userId }}</p>
       <p>状态：{{ statusLabel(detail.status) }}</p>
       <p>金额：¥{{ detail.totalAmount }}</p>
-      <ul>
-        <li v-for="item in detail.items" :key="item.id">
-          {{ item.bookTitle }} × {{ item.quantity }}　¥{{ item.subtotal }}
-        </li>
-      </ul>
-    </section>
-  </main>
+      <p v-for="item in detail.items || []" :key="item.id">{{ item.bookTitle }} × {{ item.quantity }}　¥{{ item.subtotal }}</p>
+    </el-card>
+  </div>
 </template>
 
-<script setup>
-import { onMounted, ref } from 'vue'
-import { api, formatTime, statusLabel } from '../api'
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import * as echarts from 'echarts'
+import { api } from '../http'
+import { formatTime, statusLabel } from '../format'
+import type { Order, Page } from '../types'
 
-const orders = ref([])
-const detail = ref(null)
+const orders = ref<Order[]>([])
+const detail = ref<Order | null>(null)
 const error = ref('')
 const ready = ref(false)
 const status = ref('')
+const chartEl = ref<HTMLDivElement | null>(null)
+let chart: echarts.ECharts | null = null
 
 async function load() {
-  const query = status.value ? '?status=' + status.value : ''
-  const data = await api('/api/admin/orders' + query)
+  const params: Record<string, string | number> = {}
+  if (status.value) params.status = status.value
+  const data = await api<Page<Order>>('/api/admin/orders', { params })
   orders.value = data.items
 }
 
-async function choose(next) {
-  status.value = next
+async function loadChart() {
+  const counts = { PENDING_PAY: 0, PAID: 0, CANCELLED: 0 }
+  let page = 1
+  let total = 0
+  do {
+    const data = await api<Page<Order>>('/api/admin/orders', { params: { page, size: 50 } })
+    total = data.total
+    for (const order of data.items) {
+      if (order.status in counts) counts[order.status as keyof typeof counts] += 1
+    }
+    page += 1
+  } while ((page - 1) * 50 < total)
+  if (!chart && chartEl.value) chart = echarts.init(chartEl.value)
+  chart?.setOption({
+    title: { text: '订单状态' },
+    xAxis: { type: 'category', data: ['待支付', '已支付', '已取消'] },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{ type: 'bar', data: [counts.PENDING_PAY, counts.PAID, counts.CANCELLED] }]
+  })
+}
+
+async function choose() {
   error.value = ''
   try {
     await load()
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   }
 }
 
-async function open(order) {
+async function open(order: Order) {
   error.value = ''
   try {
-    detail.value = await api('/api/admin/orders/' + order.id)
+    detail.value = await api<Order>('/api/admin/orders/' + order.id)
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   }
 }
 
 onMounted(async () => {
   try {
     await load()
+    await loadChart()
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   } finally {
     ready.value = true
   }
 })
+
+onBeforeUnmount(() => chart?.dispose())
 </script>

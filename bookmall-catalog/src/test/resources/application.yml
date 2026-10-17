@@ -7,6 +7,12 @@ bookmall:
     secret: bookmall-dev-jwt-secret-key-32b!
 
 spring:
+  profiles:
+    active: test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
   data:
     redis:
       host: localhost

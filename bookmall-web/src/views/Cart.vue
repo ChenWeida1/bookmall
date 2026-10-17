@@ -1,44 +1,44 @@
 <template>
-  <main class="page">
+  <div>
     <h1>购物车</h1>
-    <p class="muted">勾选要结算的图书。不勾选任何一行时不能提交。</p>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="!ready" class="muted">加载中</p>
-    <p v-else-if="!items.length && !error" class="muted">购物车是空的</p>
-    <table v-else>
-      <thead>
-        <tr><th></th><th>书名</th><th>单价</th><th>数量</th><th>小计</th><th>操作</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in items" :key="item.id">
-          <td><input type="checkbox" :checked="selectedIds.includes(item.id)" @change="toggle(item.id)" /></td>
-          <td>{{ item.bookTitle }}</td>
-          <td class="price">¥{{ item.unitPrice }}</td>
-          <td>
-            <button @click="change(item, item.quantity - 1)">-</button>
-            {{ item.quantity }}
-            <button @click="change(item, item.quantity + 1)">+</button>
-          </td>
-          <td>¥{{ item.subtotal }}</td>
-          <td><button class="linkish" @click="remove(item)">删除</button></td>
-        </tr>
-      </tbody>
-    </table>
-    <div v-if="items.length" style="margin-top: 16px; text-align: right">
-      <p>已选合计：<strong class="price">¥{{ selectedTotal }}</strong></p>
-      <button class="solid" :disabled="submitting || !selectedIds.length" @click="checkout">提交订单</button>
-    </div>
-  </main>
+    <p>勾选要结算的图书。不勾选任何一行时不能提交。</p>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
+    <el-skeleton v-if="!ready" :rows="3" animated />
+    <el-empty v-else-if="!items.length && !error" description="购物车是空的" />
+    <template v-else>
+      <el-table :data="items">
+        <el-table-column width="48">
+          <template #default="{ row }">
+            <el-checkbox :model-value="selectedIds.includes(row.id)" @change="toggle(row.id)" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="bookTitle" label="书名" />
+        <el-table-column label="单价"><template #default="{ row }">¥{{ row.unitPrice }}</template></el-table-column>
+        <el-table-column label="数量">
+          <template #default="{ row }">
+            <el-button @click="change(row, row.quantity - 1)">-</el-button>
+            {{ row.quantity }}
+            <el-button @click="change(row, row.quantity + 1)">+</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="小计"><template #default="{ row }">¥{{ row.subtotal }}</template></el-table-column>
+        <el-table-column label="操作"><template #default="{ row }"><el-button link @click="remove(row)">删除</el-button></template></el-table-column>
+      </el-table>
+      <p>已选合计：¥{{ selectedTotal }}</p>
+      <el-button type="primary" :disabled="submitting || !selectedIds.length" @click="checkout">提交订单</el-button>
+    </template>
+  </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '../api'
+import { api } from '../http'
+import type { CartItem } from '../types'
 
 const router = useRouter()
-const items = ref([])
-const selectedIds = ref([])
+const items = ref<CartItem[]>([])
+const selectedIds = ref<number[]>([])
 const error = ref('')
 const ready = ref(false)
 const submitting = ref(false)
@@ -51,7 +51,7 @@ const selectedTotal = computed(() => {
 })
 
 async function load() {
-  const data = await api('/api/cart')
+  const data = await api<{ items: CartItem[] }>('/api/cart')
   items.value = data.items
   const alive = new Set(data.items.map((item) => item.id))
   selectedIds.value = selectedIds.value.filter((id) => alive.has(id))
@@ -60,7 +60,7 @@ async function load() {
   }
 }
 
-function toggle(id) {
+function toggle(id: number) {
   if (selectedIds.value.includes(id)) {
     selectedIds.value = selectedIds.value.filter((item) => item !== id)
   } else {
@@ -68,17 +68,17 @@ function toggle(id) {
   }
 }
 
-async function change(item, quantity) {
+async function change(item: CartItem, quantity: number) {
   error.value = ''
   try {
-    await api('/api/cart/items/' + item.id, { method: 'PUT', body: JSON.stringify({ quantity }) })
+    await api('/api/cart/items/' + item.id, { method: 'PUT', body: { quantity } })
     await load()
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   }
 }
 
-async function remove(item) {
+async function remove(item: CartItem) {
   await api('/api/cart/items/' + item.id, { method: 'DELETE' })
   selectedIds.value = selectedIds.value.filter((id) => id !== item.id)
   await load()
@@ -89,13 +89,10 @@ async function checkout() {
   submitting.value = true
   error.value = ''
   try {
-    const order = await api('/api/orders', {
-      method: 'POST',
-      body: JSON.stringify({ itemIds: selectedIds.value })
-    })
+    const order = await api<{ id: number }>('/api/orders', { method: 'POST', body: { itemIds: selectedIds.value } })
     router.push('/orders/' + order.id)
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   } finally {
     submitting.value = false
   }
@@ -105,7 +102,7 @@ onMounted(async () => {
   try {
     await load()
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   } finally {
     ready.value = true
   }

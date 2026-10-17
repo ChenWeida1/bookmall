@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { currentUser } from './api'
+import { useSessionStore } from './stores/session'
 import Home from './views/Home.vue'
 import BookDetail from './views/BookDetail.vue'
 import Login from './views/Login.vue'
@@ -13,7 +13,6 @@ import AdminBooks from './views/AdminBooks.vue'
 import AdminOrders from './views/AdminOrders.vue'
 import AdminDeadLetters from './views/AdminDeadLetters.vue'
 import Assistant from './views/Assistant.vue'
-import { isAdmin } from './api'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -28,7 +27,6 @@ const router = createRouter({
     { path: '/orders/:id', component: OrderDetail, meta: { auth: true } },
     { path: '/notifications', component: Notifications, meta: { auth: true } },
     { path: '/assistant', component: Assistant, meta: { auth: true } },
-    // 管理端：需登录且 role=ADMIN
     { path: '/admin/books', component: AdminBooks, meta: { auth: true, admin: true } },
     { path: '/admin/orders', component: AdminOrders, meta: { auth: true, admin: true } },
     { path: '/admin/dead-letters', component: AdminDeadLetters, meta: { auth: true, admin: true } }
@@ -36,10 +34,11 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.meta.auth && !currentUser()) {
+  const session = useSessionStore()
+  if (to.meta.auth && !session.user) {
     return { path: '/login-required', query: { next: to.fullPath } }
   }
-  if (to.meta.admin && !isAdmin()) {
+  if (to.meta.admin && !session.admin) {
     return { path: '/' }
   }
   return true

@@ -35,8 +35,8 @@ seata:
       url: ${SEATA_STORE_DB_URL:jdbc:postgresql://127.0.0.1:5432/bookmall_seata}
       user: ${SEATA_STORE_DB_USER:bookmall_seata_app}
       password: ${SEATA_STORE_DB_PASSWORD:bookmall_seata_dev}
-      min-conn: 5
-      max-conn: 30
+      min-conn: 1
+      max-conn: 8
       global-table: global_table
       branch-table: branch_table
       lock-table: lock_table

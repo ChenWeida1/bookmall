@@ -1,12 +1,14 @@
 package com.bookmall.assistant;
 
 import com.bookmall.assistant.client.CatalogQueryClient;
+import com.bookmall.assistant.service.SynopsisService;
 import com.bookmall.assistant.tool.BookTools;
 import com.bookmall.common.api.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.lang.reflect.Method;
@@ -37,7 +39,7 @@ class AssistantToolBoundaryTest {
     void searchGoesToCatalog() {
         CatalogQueryClient client = mock(CatalogQueryClient.class);
         when(client.search("围城", null, null)).thenReturn(ApiResponse.ok(List.of()));
-        BookTools tools = new BookTools(client, new ObjectMapper());
+        BookTools tools = new BookTools(client, new ObjectMapper(), mock(SynopsisService.class));
         String result = tools.searchBooks("围城", null, null);
         verify(client).search("围城", null, null);
         assertTrue(result.contains("没有查到"));
@@ -51,6 +53,10 @@ class AssistantToolBoundaryTest {
         PostMapping post = method.getAnnotation(PostMapping.class);
         if (post != null && post.value().length > 0) {
             return post.value()[0];
+        }
+        PutMapping put = method.getAnnotation(PutMapping.class);
+        if (put != null && put.value().length > 0) {
+            return put.value()[0];
         }
         RequestMapping mapping = method.getAnnotation(RequestMapping.class);
         if (mapping != null && mapping.value().length > 0) {

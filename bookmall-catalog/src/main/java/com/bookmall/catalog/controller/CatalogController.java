@@ -91,9 +91,78 @@ public class CatalogController {
                 stock == null ? null : adminStock(stock)));
     }
 
+    /** 管理员新增图书。 */
+    @PostMapping("/api/admin/books")
+    public ApiResponse<Map<String, Object>> adminCreate(
+            HttpServletRequest request,
+            @RequestBody(required = false) Map<String, Object> body) {
+        JwtAuthFilter.requireAdmin(request);
+        if (body == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return ApiResponse.ok(catalogService.adminCreate(body));
+    }
+
+    /** 管理员改梗概、目录、摘录、标签和作者简介。 */
+    @PutMapping("/api/admin/books/{id}/content")
+    public ApiResponse<Map<String, Object>> adminContent(
+            HttpServletRequest request,
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        JwtAuthFilter.requireAdmin(request);
+        return ApiResponse.ok(catalogService.adminContent(parseId(id), body == null ? Map.of() : body));
+    }
+
+    /** 管理员按词查一条百科。没有词条时 data 为 null。 */
+    @GetMapping("/api/admin/books/external")
+    public ApiResponse<Map<String, Object>> adminExternal(HttpServletRequest request, @RequestParam(required = false) String q) {
+        JwtAuthFilter.requireAdmin(request);
+        return ApiResponse.ok(catalogService.searchExternal(q));
+    }
+
+    /** 把已查到的百科词条引进为店内图书。 */
+    @PostMapping("/api/admin/books/import")
+    public ApiResponse<Map<String, Object>> adminImport(
+            HttpServletRequest request,
+            @RequestBody(required = false) Map<String, Object> body) {
+        JwtAuthFilter.requireAdmin(request);
+        if (body == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return ApiResponse.ok(catalogService.adminImport(body));
+    }
+
     /**
      * 客服查书。不经网关，能看到下架书的价格、库存和状态。
      */
+    /** 客服读取梗概。不经网关。 */
+    @GetMapping("/internal/books/{id}/content")
+    public ApiResponse<Map<String, Object>> contentForAssistant(@PathVariable String id) {
+        return ApiResponse.ok(catalogService.contentForAssistant(parseId(id)));
+    }
+
+    /** 客服写入智谱梗概。已有管理员或百科正文时不覆盖。 */
+    @PutMapping("/internal/books/{id}/synopsis")
+    public ApiResponse<Map<String, Object>> saveSynopsis(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
+        Object synopsis = body == null ? null : body.get("synopsis");
+        return ApiResponse.ok(catalogService.saveZhipuSynopsis(parseId(id), synopsis == null ? null : String.valueOf(synopsis)));
+    }
+
+    /** 客服查百科。规则与管理端搜索相同。 */
+    @GetMapping("/internal/books/external")
+    public ApiResponse<Map<String, Object>> externalForAssistant(@RequestParam(required = false) String q) {
+        return ApiResponse.ok(catalogService.searchExternal(q));
+    }
+
+    /** 客服把智谱梗概写到尚未有正文的百科词条上。 */
+    @PutMapping("/internal/books/external/{lemmaId}/synopsis")
+    public ApiResponse<Map<String, Object>> saveExternalSynopsis(
+            @PathVariable String lemmaId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        Object synopsis = body == null ? null : body.get("synopsis");
+        return ApiResponse.ok(catalogService.saveZhipuLemma(parseId(lemmaId), synopsis == null ? null : String.valueOf(synopsis)));
+    }
+
     @GetMapping("/internal/books/search")
     public ApiResponse<List<Map<String, Object>>> searchForAssistant(
             @RequestParam(required = false) String title,

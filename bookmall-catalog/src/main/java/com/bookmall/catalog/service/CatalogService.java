@@ -2,6 +2,8 @@ package com.bookmall.catalog.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.bookmall.catalog.baike.BaikeCard;
+import com.bookmall.catalog.content.BookContentService;
 import com.bookmall.catalog.entity.Book;
 import com.bookmall.catalog.entity.Category;
 import com.bookmall.catalog.entity.StockChange;
@@ -18,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +48,9 @@ public class CatalogService {
 
     /** 分类与图书列表缓存。 */
     private final BookCache cache;
+
+    /** 梗概与百科词条。读失败不影响价格和库存。 */
+    private final BookContentService contents;
 
     /**
      * 列出全部分类，按主键升序。结果缓存 60 秒。
@@ -126,9 +134,117 @@ public class CatalogService {
         book.setCategoryName(category == null ? null : category.getName());
         Map<String, Object> item = listItem(book);
         item.put("description", book.getDescription());
-        item.put("isbn", null);
+        item.put("isbn", book.getIsbn());
         item.put("status", Book.statusName(book.getOnSale()));
+        contents.overlay(item, book.getId());
         return item;
+    }
+
+    /**
+     * 管理员新增图书。必填分类、书名、作者、价格、库存和上下架。
+     */
+    @Transactional
+    public Map<String, Object> adminCreate(Map<String, Object> body) {
+        Book book = new Book();
+        long categoryId = requiredLong(body.get("categoryId"));
+        if (categories.selectById(categoryId) == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        book.setCategoryId(categoryId);
+        book.setTitle(requiredText(body.get("title"), 128));
+        book.setAuthor(requiredText(body.get("author"), 64));
+        book.setPrice(requiredPrice(body.get("price")));
+        Integer stock = whole(body.get("stock"));
+        if (stock == null || stock < 0) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        book.setStock(stock);
+        book.setOnSale(parseStatus(requiredText(body.get("status"), 16)));
+        book.setCoverUrl(optionalText(body.get("coverUrl"), 255));
+        book.setDescription(optionalText(body.get("description"), 4000));
+        book.setIsbn(optionalText(body.get("isbn"), 32));
+        books.insert(book);
+        evictBooksAfterChange();
+        contents.saveAdminExtras(book.getId(), optionalText(body.get("synopsis"), 4000), stringList(body.get("tags")));
+        return detail(book.getId());
+    }
+
+    /** 管理员改梗概、目录、摘录、标签和作者简介。 */
+    @Transactional
+    public Map<String, Object> adminContent(long id, Map<String, Object> body) {
+        if (id <= 0 || books.selectById(id) == null) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        contents.replaceAdmin(id,
+                optionalText(body.get("synopsis"), 4000),
+                optionalText(body.get("contents"), 4000),
+                optionalText(body.get("excerpt"), 4000),
+                stringList(body.get("tags")),
+                optionalText(body.get("authorBio"), 4000));
+        return detail(id);
+    }
+
+    /** 管理员或客服按词查一条百科。没有词条时返回 null。 */
+    public Map<String, Object> searchExternal(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return contents.searchExternal(keyword.trim());
+    }
+
+    /** 用已搜索到的词条新建可售图书，并绑上内容文档。 */
+    @Transactional
+    public Map<String, Object> adminImport(Map<String, Object> body) {
+        Object rawLemma = body.get("lemmaId");
+        long lemmaId = requiredLong(rawLemma);
+        BaikeCard card = contents.cardForImport(lemmaId);
+        long categoryId = requiredLong(body.get("categoryId"));
+        if (categories.selectById(categoryId) == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        Integer stock = whole(body.get("stock"));
+        if (stock == null || stock < 0 || card.title() == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        Book book = new Book();
+        book.setCategoryId(categoryId);
+        book.setTitle(clip(card.title(), 128));
+        book.setAuthor(card.author() == null ? "未知" : clip(card.author(), 64));
+        book.setPrice(requiredPrice(body.get("price")));
+        book.setStock(stock);
+        book.setOnSale(parseStatus(requiredText(body.get("status"), 16)));
+        book.setCoverUrl(card.coverUrl());
+        book.setDescription(card.description() == null ? card.synopsis() : card.description());
+        books.insert(book);
+        evictBooksAfterChange();
+        contents.bindImported(book.getId(), card);
+        return detail(book.getId());
+    }
+
+    /** 客服读取一本书的内容和短简介。 */
+    public Map<String, Object> contentForAssistant(long id) {
+        Book book = books.selectById(id);
+        if (id <= 0 || book == null) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        return contents.viewForAssistant(book);
+    }
+
+    /** 客服把智谱梗概写入内容库。已有管理员或百科正文时不覆盖。 */
+    public Map<String, Object> saveZhipuSynopsis(long id, String synopsis) {
+        Book book = books.selectById(id);
+        if (id <= 0 || book == null) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        return contents.saveZhipu(book, synopsis);
+    }
+
+    /** 给没有正文的百科词条写入智谱梗概。已有管理员或百科正文时不覆盖。 */
+    public Map<String, Object> saveZhipuLemma(long lemmaId, String synopsis) {
+        if (lemmaId <= 0) {
+            throw BusinessException.notFound("图书不存在");
+        }
+        return contents.saveZhipuLemma(lemmaId, synopsis);
     }
 
     /**
@@ -356,6 +472,110 @@ public class CatalogService {
             throw BusinessException.badRequest("参数不合法");
         }
         return token.trim();
+    }
+
+    private static long requiredLong(Object value) {
+        Integer number = whole(value);
+        if (number == null || number <= 0) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return number;
+    }
+
+    private static Integer whole(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Integer number) {
+            return number;
+        }
+        if (value instanceof Long number) {
+            if (number < Integer.MIN_VALUE || number > Integer.MAX_VALUE) {
+                throw BusinessException.badRequest("参数不合法");
+            }
+            return number.intValue();
+        }
+        if (value instanceof Number number) {
+            double raw = number.doubleValue();
+            if (!Double.isFinite(raw) || raw != Math.floor(raw) || raw < Integer.MIN_VALUE || raw > Integer.MAX_VALUE) {
+                throw BusinessException.badRequest("参数不合法");
+            }
+            return number.intValue();
+        }
+        try {
+            return Integer.valueOf(String.valueOf(value).trim());
+        } catch (NumberFormatException ex) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+    }
+
+    private static String requiredText(Object value, int max) {
+        String text = optionalText(value, max);
+        if (text == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return text;
+    }
+
+    private static String optionalText(Object value, int max) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        if (text.length() > max) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return text;
+    }
+
+    private static BigDecimal requiredPrice(Object value) {
+        if (value == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        BigDecimal price;
+        try {
+            price = new BigDecimal(String.valueOf(value).trim()).stripTrailingZeros();
+        } catch (NumberFormatException ex) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        if (price.scale() < 0) {
+            price = price.setScale(0);
+        }
+        if (price.scale() > 2 || price.compareTo(BigDecimal.ZERO) < 0 || price.compareTo(new BigDecimal("99999999.99")) > 0) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return price.setScale(2, RoundingMode.UNNECESSARY);
+    }
+
+    private static List<String> stringList(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> list)) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        List<String> tags = new ArrayList<>();
+        for (Object item : list) {
+            if (item == null || String.valueOf(item).isBlank()) {
+                continue;
+            }
+            String tag = String.valueOf(item).trim();
+            if (tag.length() > 32) {
+                throw BusinessException.badRequest("参数不合法");
+            }
+            tags.add(tag);
+        }
+        return tags;
+    }
+
+    private static String clip(String value, int max) {
+        if (value.length() <= max) {
+            return value;
+        }
+        return value.substring(0, max);
     }
 
     /** 扣减数量必须是正整数。 */

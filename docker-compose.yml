@@ -43,6 +43,12 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
+  mongo:
+    image: mongo:7
+    container_name: bookmall-mongo
+    ports:
+      - "27017:27017"
+
   # 仅 Compose 与本机开发使用。生产 systemd 与 Kubernetes 不部署注册中心。
   nacos:
     image: nacos/nacos-server:v2.3.2
@@ -93,12 +99,15 @@ services:
       SPRING_DATA_REDIS_PORT: "6379"
       SEATA_ADDR: seata:8091
       ZIPKIN_EXPORT_ENABLED: "true"
+      BOOKMALL_MONGODB_URI: mongodb://mongo:27017/bookmall_content
     ports:
       - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_started
+      mongo:
         condition: service_started
       nacos:
         condition: service_started

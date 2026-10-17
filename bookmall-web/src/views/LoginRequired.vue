@@ -1,26 +1,27 @@
 <template>
-  <main>
-    <form class="card form" @submit.prevent="submit">
-      <h1>请先登录</h1>
-      <p class="muted">查看购物车、订单和消息需要登录。</p>
-      <label>用户名</label>
-      <input v-model="username" />
-      <label>密码</label>
-      <input v-model="password" type="password" />
-      <p v-if="error" class="error">{{ error }}</p>
-      <button class="solid" style="width: 100%; margin-top: 16px" type="submit">登录</button>
-      <p style="text-align: center"><router-link to="/register">没有账号？去注册</router-link></p>
-    </form>
-  </main>
+  <el-card style="max-width: 420px; margin: 40px auto">
+    <h1>请先登录</h1>
+    <p>查看购物车、订单和消息需要登录。</p>
+    <el-form @submit.prevent="submit">
+      <el-form-item label="用户名"><el-input v-model="username" /></el-form-item>
+      <el-form-item label="密码"><el-input v-model="password" type="password" show-password /></el-form-item>
+      <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
+      <el-button type="primary" native-type="submit" style="width: 100%">登录</el-button>
+      <p><router-link to="/register">没有账号？去注册</router-link></p>
+    </el-form>
+  </el-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, setSession } from '../api'
+import { api } from '../http'
+import { useSessionStore } from '../stores/session'
+import type { LoginResult } from '../types'
 
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
 const username = ref('')
 const password = ref('')
 const error = ref('')
@@ -28,14 +29,15 @@ const error = ref('')
 async function submit() {
   error.value = ''
   try {
-    const data = await api('/api/users/login', {
+    const data = await api<LoginResult>('/api/users/login', {
       method: 'POST',
-      body: JSON.stringify({ username: username.value, password: password.value })
+      body: { username: username.value, password: password.value }
     })
-    setSession(data)
-    router.push(route.query.next || '/cart')
+    session.setSession(data)
+    const next = typeof route.query.next === 'string' ? route.query.next : '/cart'
+    router.push(next)
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   }
 }
 </script>

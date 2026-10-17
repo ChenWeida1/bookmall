@@ -1,6 +1,7 @@
 package com.bookmall.assistant.tool;
 
 import com.bookmall.assistant.client.CatalogQueryClient;
+import com.bookmall.assistant.service.SynopsisService;
 import com.bookmall.common.api.ApiResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +28,8 @@ public class BookTools {
     private final CatalogQueryClient catalog;
 
     private final ObjectMapper objectMapper;
+
+    private final SynopsisService synopses;
 
     /**
      * 按书名、作者或分类查书，结果里带价格、库存和在售状态。
@@ -65,6 +68,20 @@ public class BookTools {
         } catch (FeignException | JsonProcessingException ex) {
             return "查询失败";
         }
+    }
+
+    /** 读取梗概。没有时补写并存库，再把正文返回。 */
+    @Tool("按图书编号读取梗概、目录和摘录。没有梗概时会生成一段并保存。编号不存在就说明图书不存在。")
+    public String bookSynopsis(@P("图书编号") long bookId) {
+        return synopses.ensure(bookId);
+    }
+
+    /** 查百科。结果里没有价格和库存。 */
+    @Tool("按书名或作者查询本店未上架的外部图书梗概。结果没有价格和库存。没有查到就说明没有。")
+    public String searchExternalBooks(
+            @P("书名，可空") String title,
+            @P("作者，可空") String author) {
+        return synopses.external(title, author);
     }
 
     /** 只留下客服需要的字段，避免把简介整段塞进模型。 */

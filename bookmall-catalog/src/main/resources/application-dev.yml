@@ -12,6 +12,8 @@ spring:
     redis:
       host: localhost
       port: 6379
+    mongodb:
+      uri: ${BOOKMALL_MONGODB_URI:mongodb://localhost:27017/bookmall_content}
   datasource:
     url: jdbc:postgresql://localhost:5432/bookmall_book
     username: bookmall_book_app

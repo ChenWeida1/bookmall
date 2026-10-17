@@ -1,58 +1,49 @@
 <template>
-  <main class="page">
-    <p class="muted"><router-link to="/orders">我的订单</router-link> / 订单详情</p>
+  <div>
+    <el-breadcrumb>
+      <el-breadcrumb-item to="/orders">我的订单</el-breadcrumb-item>
+      <el-breadcrumb-item>订单详情</el-breadcrumb-item>
+    </el-breadcrumb>
     <h1>订单详情</h1>
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="message" class="muted">{{ message }}</p>
-    <section v-if="order" class="card" style="padding: 16px">
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
+    <el-alert v-if="message" :title="message" type="success" show-icon :closable="false" />
+    <el-card v-if="order">
       <p>订单号：{{ order.orderNo }}</p>
-      <p>状态：<span class="badge">{{ statusLabel(order.status) }}</span></p>
+      <p>状态：{{ statusLabel(order.status) }}</p>
       <p>创建时间：{{ formatTime(order.createdAt) }}</p>
-      <p>总金额：<span class="price">¥{{ order.totalAmount }}</span></p>
+      <p>总金额：¥{{ order.totalAmount }}</p>
       <p>商品件数：{{ order.itemCount }}</p>
-      <button
-        v-if="order.status === 'PENDING_PAY'"
-        class="solid"
-        :disabled="busy"
-        @click="pay"
-      >支付</button>
-      <button
-        v-if="order.status === 'PENDING_PAY'"
-        :disabled="busy"
-        @click="cancel"
-      >取消订单</button>
-    </section>
+      <el-button v-if="order.status === 'PENDING_PAY'" type="primary" :disabled="busy" @click="pay">支付</el-button>
+      <el-button v-if="order.status === 'PENDING_PAY'" :disabled="busy" @click="cancel">取消订单</el-button>
+    </el-card>
     <h2>订单明细</h2>
-    <table v-if="order">
-      <thead><tr><th>书名</th><th>单价</th><th>数量</th><th>小计</th></tr></thead>
-      <tbody>
-        <tr v-for="item in order.items" :key="item.id">
-          <td>{{ item.bookTitle }}</td>
-          <td>¥{{ item.unitPrice }}</td>
-          <td>{{ item.quantity }}</td>
-          <td>¥{{ item.subtotal }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </main>
+    <el-table v-if="order" :data="order.items || []">
+      <el-table-column prop="bookTitle" label="书名" />
+      <el-table-column label="单价"><template #default="{ row }">¥{{ row.unitPrice }}</template></el-table-column>
+      <el-table-column prop="quantity" label="数量" />
+      <el-table-column label="小计"><template #default="{ row }">¥{{ row.subtotal }}</template></el-table-column>
+    </el-table>
+  </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, formatTime, statusLabel } from '../api'
+import { api } from '../http'
+import { formatTime, statusLabel } from '../format'
+import type { Order } from '../types'
 
 const route = useRoute()
-const order = ref(null)
+const order = ref<Order | null>(null)
 const error = ref('')
 const message = ref('')
 const busy = ref(false)
 
 onMounted(async () => {
   try {
-    order.value = await api('/api/orders/' + route.params.id)
+    order.value = await api<Order>('/api/orders/' + route.params.id)
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   }
 })
 
@@ -61,10 +52,10 @@ async function pay() {
   message.value = ''
   busy.value = true
   try {
-    order.value = await api('/api/orders/' + route.params.id + '/pay', { method: 'POST' })
+    order.value = await api<Order>('/api/orders/' + route.params.id + '/pay', { method: 'POST' })
     message.value = '支付成功'
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   } finally {
     busy.value = false
   }
@@ -75,10 +66,10 @@ async function cancel() {
   message.value = ''
   busy.value = true
   try {
-    order.value = await api('/api/orders/' + route.params.id + '/cancel', { method: 'POST' })
+    order.value = await api<Order>('/api/orders/' + route.params.id + '/cancel', { method: 'POST' })
     message.value = '订单已取消'
   } catch (ex) {
-    error.value = ex.message
+    error.value = ex instanceof Error ? ex.message : '请求失败'
   } finally {
     busy.value = false
   }

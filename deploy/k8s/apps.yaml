@@ -80,6 +80,8 @@ spec:
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: SEATA_ADDR } }
             - name: ZIPKIN_EXPORT_ENABLED
               value: "false"
+            - name: BOOKMALL_MONGODB_URI
+              value: mongodb://mongo:27017/bookmall_content
 ---
 apiVersion: v1
 kind: Service

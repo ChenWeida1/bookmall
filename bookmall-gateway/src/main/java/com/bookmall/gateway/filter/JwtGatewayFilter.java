@@ -22,6 +22,8 @@ import reactor.core.publisher.Mono;
  * 内部接口一律返回 404，避免订单服务的扣库存和写通知被外部直接调用。
  * 注册、登录，以及分类和图书的 GET 可以匿名访问。其余请求必须携带有效的 Bearer 令牌。
  * 过滤器顺序为 -100，赶在路由转发之前执行。
+ * 这里只判断令牌能否通过签名和有效期校验，不读取用户编号，也不区分读者和管理员；
+ * 通过后原请求头原样转发，下游服务自己再解析。
  */
 @Component
 @RequiredArgsConstructor
@@ -43,21 +45,26 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
+        // 内部路径不进入后续路由。空响应，状态码 404。
         if (path.startsWith("/internal/") || "/internal".equals(path)) {
             exchange.getResponse().setStatusCode(HttpStatus.NOT_FOUND);
             return exchange.getResponse().setComplete();
         }
+        // OPTIONS 是浏览器跨域预检；公开接口允许匿名。两者都不校验令牌。
         if (HttpMethod.OPTIONS.equals(exchange.getRequest().getMethod()) || isPublic(exchange, path)) {
             return chain.filter(exchange);
         }
         String header = exchange.getRequest().getHeaders().getFirst("Authorization");
+        // 没有 Authorization，或不是 "Bearer " 开头，按未登录返回。
         if (header == null || !header.startsWith("Bearer ")) {
             return unauthorized(exchange);
         }
         try {
+            // substring(7) 去掉 "Bearer "。parse 验 HMAC 签名、过期时间和格式；返回值不使用。
             jwtService.parse(header.substring(7).trim());
             return chain.filter(exchange);
         } catch (JwtException | IllegalArgumentException ex) {
+            // 签名不对、已过期或格式坏，与缺少令牌一样返回 401。
             return unauthorized(exchange);
         }
     }
@@ -68,11 +75,13 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
      */
     private boolean isPublic(ServerWebExchange exchange, String path) {
         HttpMethod method = exchange.getRequest().getMethod();
+        // 注册、登录必须路径完全一致，避免放行 /api/users 下的其他 POST。
         if (HttpMethod.POST.equals(method)
                 && ("/api/users/register".equals(path) || "/api/users/login".equals(path))) {
             return true;
         }
         if (HttpMethod.GET.equals(method)) {
+            // 分类和图书列表用精确路径；详情是 /api/books/{id}，用前缀。改书、购物车、订单不在此列。
             return "/api/categories".equals(path)
                     || "/api/books".equals(path)
                     || path.startsWith("/api/books/");
@@ -88,6 +97,7 @@ public class JwtGatewayFilter implements GlobalFilter, Ordered {
         } catch (Exception ex) {
             body = "{\"code\":40100,\"message\":\"未登录或登录已失效\",\"data\":null}".getBytes();
         }
+        // HTTP 401，正文 code = 40100，与业务服务的未登录包络一致。
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
         DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(body);

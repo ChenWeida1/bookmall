@@ -16,6 +16,8 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:redis}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+    mongodb:
+      uri: ${BOOKMALL_MONGODB_URI:mongodb://mongo:27017/bookmall_content}
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}

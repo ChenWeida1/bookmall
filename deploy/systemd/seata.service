@@ -8,6 +8,13 @@ WorkingDirectory=/opt/seata
 Environment=SEATA_STORE_DB_URL=jdbc:postgresql://127.0.0.1:5432/bookmall_seata
 Environment=SEATA_STORE_DB_USER=bookmall_seata_app
 Environment=SEATA_STORE_DB_PASSWORD=bookmall_seata_dev
+# 镜像默认 -Xmx2048m -Xms2048m，直接内存 1024m。2GB 云主机上会把整机拖死。
+Environment=JVM_XMX=128m
+Environment=JVM_XMS=64m
+Environment=JVM_MetaspaceSize=64m
+Environment=JVM_MaxMetaspaceSize=96m
+Environment=JVM_MaxDirectMemorySize=64m
+MemoryMax=400M
 ExecStart=/opt/seata/bin/seata-server.sh
 Restart=on-failure
 

@@ -17,6 +17,7 @@ CREATE TABLE book (
     price       numeric(10, 2) NOT NULL,
     stock       integer        NOT NULL,
     description text,
+    isbn        varchar(32),
     on_sale     boolean        NOT NULL,
     CONSTRAINT fk_book_category FOREIGN KEY (category_id) REFERENCES category (id),
     CONSTRAINT ck_book_price_nonneg CHECK (price >= 0),
@@ -30,7 +31,7 @@ COMMENT ON TABLE category IS '图书分类。第一版由种子数据提供。';
 COMMENT ON COLUMN category.id IS '分类 ID';
 COMMENT ON COLUMN category.name IS '分类名称，全库唯一';
 
-COMMENT ON TABLE book IS '图书。isbn 不在本表，第一版详情接口无数据时返回 null。';
+COMMENT ON TABLE book IS '图书。isbn 可空，第六期起详情返回该列。';
 COMMENT ON COLUMN book.id IS '图书 ID';
 COMMENT ON COLUMN book.category_id IS '所属分类 ID，外键引用 category.id';
 COMMENT ON COLUMN book.title IS '书名';
@@ -39,6 +40,7 @@ COMMENT ON COLUMN book.cover_url IS '封面图片地址，可空';
 COMMENT ON COLUMN book.price IS '单价，单位元，最多两位小数';
 COMMENT ON COLUMN book.stock IS '可售库存，必须大于等于 0。扣减时须满足 stock >= 扣减数量';
 COMMENT ON COLUMN book.description IS '简介，可空';
+COMMENT ON COLUMN book.isbn IS 'ISBN，可空，最长 32';
 COMMENT ON COLUMN book.on_sale IS '是否在售。true=在售，false=下架';
 
 CREATE TABLE stock_change (

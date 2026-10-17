@@ -1,7 +1,9 @@
 package com.bookmall.assistant.config;
 
 import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -34,6 +36,26 @@ public class LlmConfiguration {
                 .temperature(properties.getTemperature())
                 .maxTokens(properties.getMaxTokens())
                 .timeout(Duration.ofSeconds(60))
+                .httpClientBuilder(http)
+                .logRequests(false)
+                .logResponses(false)
+                .build();
+    }
+
+    /** 补写梗概用的非流式模型。同样不记录请求，避免密钥进日志。 */
+    @Bean
+    @Conditional(ApiKeyPresentCondition.class)
+    ChatModel chatModel(LlmProperties properties) {
+        JdkHttpClientBuilder http = new JdkHttpClientBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .readTimeout(Duration.ofSeconds(30));
+        return OpenAiChatModel.builder()
+                .baseUrl(properties.getBaseUrl())
+                .apiKey(properties.getApiKey())
+                .modelName(properties.getModel())
+                .temperature(0.3)
+                .maxTokens(512)
+                .timeout(Duration.ofSeconds(30))
                 .httpClientBuilder(http)
                 .logRequests(false)
                 .logResponses(false)

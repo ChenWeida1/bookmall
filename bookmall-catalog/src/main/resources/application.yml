@@ -1,6 +1,10 @@
 server:
   port: 8082
 
+bookmall:
+  baike:
+    app-id: ${BAIKE_APP_ID:379020}
+
 spring:
   profiles:
     default: dev
@@ -42,6 +46,9 @@ logging:
     level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
 
 management:
+  health:
+    mongo:
+      enabled: false
   tracing:
     sampling:
       probability: 1.0

@@ -50,6 +50,9 @@ public class Book {
     /** 图书简介，仅详情接口返回。 */
     private String description;
 
+    /** ISBN，可空。详情接口没有值时返回 null。 */
+    private String isbn;
+
     /** 是否在售。true 在售，false 下架。 */
     private Boolean onSale;
 

@@ -7,6 +7,8 @@ spring:
     redis:
       host: ${BOOKMALL_REDIS_HOST:127.0.0.1}
       port: ${BOOKMALL_REDIS_PORT:6379}
+    mongodb:
+      uri: ${BOOKMALL_MONGODB_URI:mongodb://127.0.0.1:27017/bookmall_content}
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/bookmall_book
     username: bookmall_book_app
