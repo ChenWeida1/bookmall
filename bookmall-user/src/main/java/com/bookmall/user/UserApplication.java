@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
+
 /**
  * 用户服务入口。
  * <p>
@@ -35,6 +37,12 @@ public class UserApplication {
     @Bean
     JwtService jwtService(@Value("${bookmall.jwt.secret}") String secret) {
         return new JwtService(secret);
+    }
+
+    /** 登录令牌有效期。默认 24 小时。 */
+    @Bean
+    Duration tokenTtl(@Value("${bookmall.jwt.ttl:24h}") Duration ttl) {
+        return ttl;
     }
 
     /**

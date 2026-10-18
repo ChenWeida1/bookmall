@@ -1,7 +1,8 @@
 package com.bookmall.catalog.baike;
 
+import com.bookmall.catalog.config.BaikeProperties;
 import com.bookmall.common.error.BusinessException;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -10,28 +11,26 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.time.Duration;
 
 /**
- * 调用百度百科名片接口。超时 3 秒。appid 用公开示例，不记录响应正文以外的地址参数。
+ * 调用百度百科名片接口。超时和地址来自配置。刷新后按新超时重建客户端。
+ * appid 用公开示例，不记录响应正文以外的地址参数。
  */
 @Component
 @Profile("!test")
+@RefreshScope
 public class HttpBaikeClient implements BaikeClient {
 
     private final RestClient client;
 
-    private final String appId;
+    private final BaikeProperties baike;
 
-    public HttpBaikeClient(@Value("${bookmall.baike.app-id:379020}") String appId) {
+    public HttpBaikeClient(BaikeProperties baike) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(3));
-        factory.setReadTimeout(Duration.ofSeconds(3));
-        this.client = RestClient.builder()
-                .baseUrl("https://baike.baidu.com")
-                .requestFactory(factory)
-                .build();
-        this.appId = appId;
+        factory.setConnectTimeout(baike.getTimeout());
+        factory.setReadTimeout(baike.getTimeout());
+        this.client = RestClient.builder().requestFactory(factory).build();
+        this.baike = baike;
     }
 
     @Override
@@ -39,12 +38,12 @@ public class HttpBaikeClient implements BaikeClient {
         if (keyword == null || keyword.isBlank()) {
             throw BusinessException.badRequest("参数不合法");
         }
-        URI uri = UriComponentsBuilder.fromHttpUrl("https://baike.baidu.com/api/openapi/BaikeLemmaCardApi")
+        URI uri = UriComponentsBuilder.fromHttpUrl(baike.getCardUrl())
                 .queryParam("scope", 103)
                 .queryParam("format", "json")
-                .queryParam("appid", appId)
+                .queryParam("appid", baike.getAppId())
                 .queryParam("bk_key", keyword.trim())
-                .queryParam("bk_length", 600)
+                .queryParam("bk_length", baike.getExcerptLength())
                 .build()
                 .encode()
                 .toUri();

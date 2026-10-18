@@ -97,9 +97,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: bookmall_book_dev
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      SEATA_ADDR: seata:8091
       ZIPKIN_EXPORT_ENABLED: "true"
       BOOKMALL_MONGODB_URI: mongodb://mongo:27017/bookmall_content
+      SPRING_CONFIG_IMPORT: optional:nacos:bookmall-catalog.yaml?refreshEnabled=true
     ports:
       - "8082:8082"
     depends_on:
@@ -110,8 +110,6 @@ services:
       mongo:
         condition: service_started
       nacos:
-        condition: service_started
-      seata:
         condition: service_started
 
   order:
@@ -133,7 +131,6 @@ services:
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
-      SEATA_ADDR: seata:8091
       ZIPKIN_EXPORT_ENABLED: "true"
     ports:
       - "8083:8083"
@@ -145,8 +142,6 @@ services:
       catalog:
         condition: service_started
       nacos:
-        condition: service_started
-      seata:
         condition: service_started
 
   notification:
@@ -227,23 +222,6 @@ services:
         condition: service_started
       nacos:
         condition: service_started
-
-  seata:
-    image: apache/seata-server:2.1.0
-    container_name: bookmall-seata
-    environment:
-      SEATA_PORT: "8091"
-      SEATA_STORE_DB_URL: jdbc:postgresql://postgres:5432/bookmall_seata
-      SEATA_STORE_DB_USER: bookmall_seata_app
-      SEATA_STORE_DB_PASSWORD: bookmall_seata_dev
-    volumes:
-      - ./deploy/seata/application.yml:/seata-server/resources/application.yml
-    ports:
-      - "8091:8091"
-      - "7091:7091"
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   zipkin:
     image: openzipkin/zipkin:3.4

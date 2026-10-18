@@ -5,16 +5,17 @@
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
     <el-skeleton v-if="!ready" :rows="3" animated />
     <el-empty v-else-if="!items.length" description="还没有对话" />
-    <el-card v-for="item in items" :key="item.id || item.localId" style="margin-bottom: 12px">
-      <template #header>
-        <span>{{ item.role === 'user' ? '我' : '客服' }}</span>
-        <span style="float: right">{{ formatTime(item.createdAt) }}</span>
+    <div v-else class="thread">
+      <template v-for="(item, index) in items" :key="item.id || item.localId">
+        <div v-if="showTime(index)" class="bubble-time">{{ formatTime(item.createdAt) }}</div>
+        <div class="bubble-row" :class="item.role === 'user' ? 'is-mine' : 'is-service'">
+          <div class="bubble">{{ item.content }}</div>
+        </div>
       </template>
-      <p style="white-space: pre-wrap">{{ item.content }}</p>
-    </el-card>
+    </div>
     <el-pagination layout="prev, pager, next" :current-page="page" :page-size="10" :total="total" @current-change="load" />
-    <el-form inline @submit.prevent="send">
-      <el-input v-model="draft" :disabled="sending" placeholder="想找哪本书" style="width: 360px" />
+    <el-form class="composer" @submit.prevent="send">
+      <el-input v-model="draft" :disabled="sending" placeholder="想找哪本书" />
       <el-button type="primary" native-type="submit" :disabled="sending">发送</el-button>
     </el-form>
   </div>
@@ -36,6 +37,19 @@ const total = ref(0)
 const pages = computed(() => Math.max(1, Math.ceil(total.value / 10)))
 let localSeq = 0
 void pages
+
+const timeGapMs = 5 * 60 * 1000
+
+function showTime(index: number) {
+  const current = items.value[index]
+  if (!current?.createdAt) return false
+  if (index === 0) return true
+  const previous = items.value[index - 1]
+  const previousMs = Date.parse(previous?.createdAt ?? '')
+  const currentMs = Date.parse(current.createdAt)
+  if (Number.isNaN(previousMs) || Number.isNaN(currentMs)) return true
+  return Math.abs(currentMs - previousMs) > timeGapMs
+}
 
 async function load(nextPage: number) {
   error.value = ''
@@ -122,3 +136,65 @@ onMounted(async () => {
   ready.value = true
 })
 </script>
+
+<style scoped>
+.thread {
+  background: #f0f2f5;
+  border-radius: 6px;
+  padding: 16px 14px 6px;
+  margin: 12px 0 4px;
+}
+
+.bubble-time {
+  margin: 6px 0 10px;
+  text-align: center;
+  color: #a8abb2;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bubble-row {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.bubble-row.is-mine {
+  justify-content: flex-end;
+}
+
+.bubble-row.is-service {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: min(72%, 560px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+  font-size: 14px;
+  color: #1f2329;
+}
+
+.is-mine .bubble {
+  background: #95ec69;
+}
+
+.is-service .bubble {
+  background: #fff;
+  border: 1px solid #ececec;
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.composer :deep(.el-input) {
+  flex: 1;
+}
+</style>

@@ -5,7 +5,7 @@ alwaysApply: true
 
 # 代码评审
 
-对照 `docs/接口文档.md` 与 `docs/需求规格说明书.md` 审当前版本范围。只报会到达运行时的缺陷，不改风格偏好。依赖已是 `final`、构造器只做赋值时除外：改为 `@RequiredArgsConstructor`。
+对照 `docs/接口文档.md` 与 `docs/需求规格说明书.md` 审当前版本范围。只报会到达运行时的缺陷，不改风格偏好。能用 Lombok 注解替换的手写样板除外（含 `final` 依赖只赋值的构造器改为 `@RequiredArgsConstructor`）。
 
 ## 必须拦住
 
@@ -16,6 +16,8 @@ alwaysApply: true
 - 写入当前版本文档未约定的能力：真实支付、退款、物流、地址、优惠、评价、全部已读等。
 - 密码、JWT secret 写入日志、响应体或前端除 `localStorage` 的 `bookmall.token` 以外的位置。接口密钥保持服务端配置，不进前端包。
 - 管理端接口未校验管理员角色，或普通读者可改图书上下架。
+- 业务阈值、超时、外部地址、公开 appid 写死在 Java 里。错误码、状态枚举、队列名、接口路径仍留在代码里。配置类里的默认值可以留着，业务代码要读配置。
+- 能用 Lombok 注解时仍手写样板：`final` 字段注入改为 `@RequiredArgsConstructor`，手写 getter/setter、数据类样板、日志字段、建造者分别改为 `@Getter`/`@Setter`、`@Data`、`@Slf4j`、`@Builder`。
 
 ## 改完要测
 
@@ -43,6 +45,18 @@ fetch('http://localhost:8082/api/books')
 
 // 通过：只走 api()，基址是网关
 const books = await api('/api/books')
+```
+
+```java
+// 失败：对照上限写死，改配置不会生效
+if (queries.size() > 20) {
+    throw BusinessException.badRequest("参数不合法");
+}
+
+// 通过：读 bookmall.compare.max-titles
+if (queries.size() > limits.getMaxTitles()) {
+    throw BusinessException.badRequest("参数不合法");
+}
 ```
 
 ```java

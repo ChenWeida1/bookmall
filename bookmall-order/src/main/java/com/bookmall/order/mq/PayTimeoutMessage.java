@@ -1,11 +1,21 @@
 package com.bookmall.order.mq;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 /**
  * 待支付订单的超时关单消息。
  * <p>
  * 下单成功后发到延迟队列，消息过期后由死信转入超时队列。
  * 消费者只在订单仍是待支付时取消并还库存。
+ * 空构造供 JSON 反序列化，全参构造供投递时组装。
  */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class PayTimeoutMessage {
 
     /** 支付超时交换机。延迟队列和超时队列都绑在这里。 */
@@ -34,28 +44,4 @@ public class PayTimeoutMessage {
 
     private long orderId;
     private long userId;
-
-    public PayTimeoutMessage() {
-    }
-
-    public PayTimeoutMessage(long orderId, long userId) {
-        this.orderId = orderId;
-        this.userId = userId;
-    }
-
-    public long getOrderId() {
-        return orderId;
-    }
-
-    public void setOrderId(long orderId) {
-        this.orderId = orderId;
-    }
-
-    public long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(long userId) {
-        this.userId = userId;
-    }
 }

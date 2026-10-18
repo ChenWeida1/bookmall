@@ -4,6 +4,9 @@ server:
 bookmall:
   # 待支付超时。开发环境在 application-dev.yml 里改成 1 分钟。
   pay-timeout: 15m
+  catalog-connect-timeout: 3s
+  catalog-read-timeout: 3s
+  notification-timeout: 1s
 
 spring:
   rabbitmq:
@@ -36,20 +39,6 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-
-seata:
-  enabled: true
-  application-id: ${spring.application.name}
-  tx-service-group: bookmall-tx-group
-  service:
-    vgroup-mapping:
-      bookmall-tx-group: default
-    grouplist:
-      default: ${SEATA_ADDR:127.0.0.1:8091}
-  registry:
-    type: file
-  config:
-    type: file
 
 logging:
   pattern:

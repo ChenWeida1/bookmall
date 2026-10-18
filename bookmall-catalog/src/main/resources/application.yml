@@ -4,6 +4,16 @@ server:
 bookmall:
   baike:
     app-id: ${BAIKE_APP_ID:379020}
+    card-url: https://baike.baidu.com/api/openapi/BaikeLemmaCardApi
+    timeout: 3s
+    excerpt-length: 600
+  compare:
+    max-titles: 20
+    parallelism: 4
+    deadline: 20s
+    permit-wait: 15s
+  cache:
+    book-ttl: 60s
 
 spring:
   profiles:
@@ -16,6 +26,8 @@ spring:
         enabled: false
       config:
         enabled: false
+        import-check:
+          enabled: false
   datasource:
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
@@ -26,20 +38,6 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-
-seata:
-  enabled: true
-  application-id: ${spring.application.name}
-  tx-service-group: bookmall-tx-group
-  service:
-    vgroup-mapping:
-      bookmall-tx-group: default
-    grouplist:
-      default: ${SEATA_ADDR:127.0.0.1:8091}
-  registry:
-    type: file
-  config:
-    type: file
 
 logging:
   pattern:

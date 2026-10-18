@@ -1,10 +1,16 @@
 package com.bookmall.assistant.config;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.time.Duration;
 
 /**
  * 智谱 OpenAI 兼容接口的配置。密钥只留在服务端。
  */
+@Getter
+@Setter
 @ConfigurationProperties(prefix = "bookmall.llm")
 public class LlmProperties {
 
@@ -23,45 +29,17 @@ public class LlmProperties {
     /** 单次回答上限。 */
     private int maxTokens = 2048;
 
-    public String getApiKey() {
-        return apiKey;
-    }
+    /** 连接超时。 */
+    private Duration connectTimeout = Duration.ofSeconds(5);
 
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey;
-    }
+    /** 流式读取超时。 */
+    private Duration streamTimeout = Duration.ofSeconds(60);
 
-    public String getBaseUrl() {
-        return baseUrl;
-    }
+    /** 补写梗概的读取超时。 */
+    private Duration chatTimeout = Duration.ofSeconds(30);
 
-    public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl;
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
-    }
-
-    public double getTemperature() {
-        return temperature;
-    }
-
-    public void setTemperature(double temperature) {
-        this.temperature = temperature;
-    }
-
-    public int getMaxTokens() {
-        return maxTokens;
-    }
-
-    public void setMaxTokens(int maxTokens) {
-        this.maxTokens = maxTokens;
-    }
+    /** 补写梗概的生成上限，比对话短。 */
+    private int synopsisMaxTokens = 512;
 
     /** 密钥去掉空白后仍有内容才算已配置。 */
     public boolean configured() {

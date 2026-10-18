@@ -12,6 +12,10 @@ spring:
       discovery:
         enabled: ${BOOKMALL_NACOS_ENABLED:true}
         server-addr: ${BOOKMALL_NACOS_ADDR:nacos:8848}
+      config:
+        enabled: ${BOOKMALL_NACOS_ENABLED:true}
+        server-addr: ${BOOKMALL_NACOS_ADDR:nacos:8848}
+        refresh-enabled: true
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:redis}

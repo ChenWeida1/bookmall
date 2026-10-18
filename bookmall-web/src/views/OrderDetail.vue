@@ -17,7 +17,7 @@
       <el-button v-if="order.status === 'PENDING_PAY'" :disabled="busy" @click="cancel">取消订单</el-button>
     </el-card>
     <h2>订单明细</h2>
-    <el-table v-if="order" :data="order.items || []">
+    <el-table v-if="order" :data="order.items || []" stripe>
       <el-table-column prop="bookTitle" label="书名" />
       <el-table-column label="单价"><template #default="{ row }">¥{{ row.unitPrice }}</template></el-table-column>
       <el-table-column prop="quantity" label="数量" />

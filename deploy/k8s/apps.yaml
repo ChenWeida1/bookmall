@@ -76,8 +76,6 @@ spec:
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_REDIS_HOST } }
             - name: SPRING_DATA_REDIS_PORT
               valueFrom: { configMapKeyRef: { name: bookmall-config, key: BOOKMALL_REDIS_PORT } }
-            - name: SEATA_ADDR
-              valueFrom: { configMapKeyRef: { name: bookmall-config, key: SEATA_ADDR } }
             - name: ZIPKIN_EXPORT_ENABLED
               value: "false"
             - name: BOOKMALL_MONGODB_URI
@@ -133,8 +131,6 @@ spec:
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_RABBITMQ_USER } }
             - name: SPRING_RABBITMQ_PASSWORD
               valueFrom: { secretKeyRef: { name: bookmall-secret, key: BOOKMALL_RABBITMQ_PASSWORD } }
-            - name: SEATA_ADDR
-              valueFrom: { configMapKeyRef: { name: bookmall-config, key: SEATA_ADDR } }
             - name: ZIPKIN_EXPORT_ENABLED
               value: "false"
 ---

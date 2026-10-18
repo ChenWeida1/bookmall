@@ -1,5 +1,7 @@
 package com.bookmall.common.error;
 
+import lombok.Getter;
+
 /**
  * 可预期的业务异常。
  * <p>
@@ -7,6 +9,7 @@ package com.bookmall.common.error;
  * {@code httpStatus} 是协议层状态，{@code code} 是业务错误码，两者可以不同。
  * {@code data} 用来带回失败上下文，例如库存不足时的剩余数量。
  */
+@Getter
 public class BusinessException extends RuntimeException {
 
     /** HTTP 状态码，例如 400、401、404。 */
@@ -42,21 +45,6 @@ public class BusinessException extends RuntimeException {
         this.httpStatus = httpStatus;
         this.code = code;
         this.data = data;
-    }
-
-    /** @return HTTP 状态码 */
-    public int getHttpStatus() {
-        return httpStatus;
-    }
-
-    /** @return 业务错误码 */
-    public int getCode() {
-        return code;
-    }
-
-    /** @return 失败上下文 */
-    public Object getData() {
-        return data;
     }
 
     /**

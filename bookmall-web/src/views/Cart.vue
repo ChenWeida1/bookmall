@@ -6,7 +6,7 @@
     <el-skeleton v-if="!ready" :rows="3" animated />
     <el-empty v-else-if="!items.length && !error" description="购物车是空的" />
     <template v-else>
-      <el-table :data="items">
+      <el-table :data="items" stripe>
         <el-table-column width="48">
           <template #default="{ row }">
             <el-checkbox :model-value="selectedIds.includes(row.id)" @change="toggle(row.id)" />

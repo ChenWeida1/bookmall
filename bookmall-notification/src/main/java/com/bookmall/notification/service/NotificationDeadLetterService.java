@@ -42,7 +42,11 @@ public class NotificationDeadLetterService {
         });
     }
 
-    /** 处理最早的一条。replay 重投到通知队列，discard 直接确认丢弃。 */
+    /**
+     * 处理死信队列里最早的一条。
+     * basicGet 先把队头拿到手里，此时还没从队列删掉；最后的 basicAck 才真正删掉。
+     * replay 先把原文发回正常通知队列，再确认删除。discard 不转发，直接确认删除。
+     */
     public Map<String, Object> act(String action) {
         boolean discard = "discard".equals(action);
         boolean replay = "replay".equals(action);
@@ -50,6 +54,7 @@ public class NotificationDeadLetterService {
             throw BusinessException.badRequest("参数不合法");
         }
         return execute(channel -> {
+            // 第二个参数 false：取出后先占住，不自动删除。队列空时返回 null。
             GetResponse got = channel.basicGet(NotificationMessage.DLQ, false);
             if (got == null) {
                 throw BusinessException.badRequest("没有可处理的死信");
@@ -59,12 +64,15 @@ public class NotificationDeadLetterService {
             body.put("action", action);
             body.put("message", readBody(got));
             if (replay) {
+                // deliveryMode = 2 表示消息落盘，RabbitMQ 重启后还在。
                 AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
                         .contentType("application/json")
                         .deliveryMode(2)
                         .build();
+                // 发回正常交换机和路由键。正文用取出的原始字节，不改内容。
                 channel.basicPublish(NotificationMessage.EXCHANGE, NotificationMessage.ROUTING_KEY, props, got.getBody());
             }
+            // deliveryTag 是这次取出的回执号。第二个参数 false 表示只确认这一条。
             channel.basicAck(got.getEnvelope().getDeliveryTag(), false);
             return body;
         });

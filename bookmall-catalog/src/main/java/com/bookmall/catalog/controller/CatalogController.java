@@ -1,5 +1,6 @@
 package com.bookmall.catalog.controller;
 
+import com.bookmall.catalog.service.BookCompareService;
 import com.bookmall.catalog.service.CatalogService;
 import com.bookmall.common.api.ApiResponse;
 import com.bookmall.common.api.PageResult;
@@ -30,6 +31,9 @@ public class CatalogController {
 
     /** 目录与库存逻辑。 */
     private final CatalogService catalogService;
+
+    /** 进货对照。用虚拟线程同时查本店和百科。 */
+    private final BookCompareService compares;
 
     /**
      * 列出全部分类。
@@ -130,6 +134,18 @@ public class CatalogController {
             throw BusinessException.badRequest("参数不合法");
         }
         return ApiResponse.ok(catalogService.adminImport(body));
+    }
+
+    /** 管理员一次对照多本书。读者返回 40300。 */
+    @PostMapping("/api/admin/books/compare")
+    public ApiResponse<Map<String, Object>> compare(
+            HttpServletRequest request,
+            @RequestBody(required = false) Map<String, Object> body) {
+        JwtAuthFilter.requireAdmin(request);
+        if (body == null) {
+            throw BusinessException.badRequest("参数不合法");
+        }
+        return ApiResponse.ok(compares.compare(body.get("titles")));
     }
 
     /**

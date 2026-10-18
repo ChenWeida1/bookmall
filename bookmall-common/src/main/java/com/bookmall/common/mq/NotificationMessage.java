@@ -1,10 +1,20 @@
 package com.bookmall.common.mq;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 /**
  * 订单服务投递、通知服务消费的站内信消息。
  * <p>
  * {@code bizKey} 用于至少一次投递下的幂等写入，例如 {@code ORDER_CREATED:20261011...}。
+ * 空构造供 JSON 反序列化，全参构造供投递时组装。
  */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class NotificationMessage {
 
     /** 交换机名。 */
@@ -29,46 +39,4 @@ public class NotificationMessage {
     private String title;
     private String content;
     private String bizKey;
-
-    public NotificationMessage() {
-    }
-
-    public NotificationMessage(long userId, String title, String content, String bizKey) {
-        this.userId = userId;
-        this.title = title;
-        this.content = content;
-        this.bizKey = bizKey;
-    }
-
-    public long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(long userId) {
-        this.userId = userId;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getBizKey() {
-        return bizKey;
-    }
-
-    public void setBizKey(String bizKey) {
-        this.bizKey = bizKey;
-    }
 }

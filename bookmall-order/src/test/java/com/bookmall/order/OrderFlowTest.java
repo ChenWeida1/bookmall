@@ -98,20 +98,22 @@ class OrderFlowTest {
         verify(payTimeouts).schedule(eq(((Number) created.get("id")).longValue()), eq(910003L));
     }
 
-    /** 第二本书扣减失败时，不再手工回补。库存交给 Seata 回滚。 */
+    /** 第二本书扣减失败时，已扣的第一本按令牌加回。第二本也按令牌回补，目录侧没有扣减记录时是空操作。 */
     @Test
-    void deductFailureDoesNotRestoreManually() {
+    void deductFailureRestoresEarlierBooks() {
         saveCart(910004L, 1L, 1);
         saveCart(910004L, 2L, 1);
         when(catalog.getBook(1L)).thenReturn(book(1, 5));
         when(catalog.getBook(2L)).thenReturn(book(2, 5));
         org.mockito.Mockito.doThrow(new BusinessException(400, 40006, "库存不足"))
                 .when(catalog).deduct(eq(2L), eq(1), anyString());
-        assertThrows(BusinessException.class, () -> orders.create(910004L, null));
-        verify(catalog, never()).restore(anyLong(), anyInt(), anyString());
+        BusinessException ex = assertThrows(BusinessException.class, () -> orders.create(910004L, null));
+        assertEquals(40006, ex.getCode());
+        verify(catalog).restore(eq(1L), eq(1), anyString());
+        verify(catalog).restore(eq(2L), eq(1), anyString());
     }
 
-    /** 扣减时才发现库存不足，响应仍是 data.items。已经扣掉的库存不再手工回补。 */
+    /** 扣减时才发现库存不足，响应仍是 data.items，并按令牌回补这一本。 */
     @Test
     void deductRaceStillReportsItems() {
         saveCart(910030L, 1L, 2);
@@ -127,7 +129,7 @@ class OrderFlowTest {
         assertEquals("围城", row.get("bookTitle"));
         assertEquals(1, ((Number) row.get("stock")).intValue());
         assertEquals(2, ((Number) row.get("quantity")).intValue());
-        verify(catalog, never()).restore(anyLong(), anyInt(), anyString());
+        verify(catalog).restore(eq(1L), eq(2), anyString());
     }
 
     /** 日志级别图案带追踪号，并且能生成非空的 traceId。 */

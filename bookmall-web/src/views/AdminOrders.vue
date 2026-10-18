@@ -12,7 +12,7 @@
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
     <el-skeleton v-if="!ready" :rows="3" animated />
     <el-empty v-else-if="!orders.length && !error" description="没有订单" />
-    <el-table v-else :data="orders">
+    <el-table v-else :data="orders" stripe>
       <el-table-column prop="userId" label="用户" />
       <el-table-column prop="orderNo" label="订单号" />
       <el-table-column label="总金额"><template #default="{ row }">¥{{ row.totalAmount }}</template></el-table-column>

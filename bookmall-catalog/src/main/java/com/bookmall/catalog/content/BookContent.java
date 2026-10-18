@@ -1,5 +1,7 @@
 package com.bookmall.catalog.content;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -13,6 +15,8 @@ import java.util.List;
  * {@code bookId} 有值时唯一，表示已上架到 PostgreSQL。
  * {@code lemmaId} 是百度百科词条编号，未引进时 {@code bookId} 为空。
  */
+@Getter
+@Setter
 @Document("book_content")
 public class BookContent {
 
@@ -65,110 +69,6 @@ public class BookContent {
 
     /** 百科链接。 */
     private String url;
-
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public Long getBookId() {
-        return bookId;
-    }
-
-    public void setBookId(Long bookId) {
-        this.bookId = bookId;
-    }
-
-    public Long getLemmaId() {
-        return lemmaId;
-    }
-
-    public void setLemmaId(Long lemmaId) {
-        this.lemmaId = lemmaId;
-    }
-
-    public String getSynopsis() {
-        return synopsis;
-    }
-
-    public void setSynopsis(String synopsis) {
-        this.synopsis = synopsis;
-    }
-
-    public String getContents() {
-        return contents;
-    }
-
-    public void setContents(String contents) {
-        this.contents = contents;
-    }
-
-    public String getExcerpt() {
-        return excerpt;
-    }
-
-    public void setExcerpt(String excerpt) {
-        this.excerpt = excerpt;
-    }
-
-    public List<String> getTags() {
-        return tags;
-    }
-
-    public void setTags(List<String> tags) {
-        this.tags = tags;
-    }
-
-    public String getAuthorBio() {
-        return authorBio;
-    }
-
-    public void setAuthorBio(String authorBio) {
-        this.authorBio = authorBio;
-    }
-
-    public String getIsbn() {
-        return isbn;
-    }
-
-    public void setIsbn(String isbn) {
-        this.isbn = isbn;
-    }
-
-    public String getSource() {
-        return source;
-    }
-
-    public void setSource(String source) {
-        this.source = source;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        this.author = author;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
 
     /** 已有管理员或百科正文时，智谱不能改写。 */
     public boolean lockedSynopsis() {

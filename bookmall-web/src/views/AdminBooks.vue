@@ -75,6 +75,30 @@
         </el-form>
       </div>
     </el-card>
+
+    <el-card header="进货对照" style="margin-top: 16px">
+      <p>每行一个书名，最多 20 本。本店显示价格和库存，百科结果没有价格和库存。</p>
+      <el-input v-model="compareText" type="textarea" :rows="4" placeholder="围城" />
+      <el-button type="primary" :disabled="busy" @click="compareBooks">对照</el-button>
+      <el-table v-if="compared.length" :data="compared" style="margin-top: 12px">
+        <el-table-column prop="query" label="书名" />
+        <el-table-column label="本店">
+          <template #default="{ row }">{{ storeText(row) }}</template>
+        </el-table-column>
+        <el-table-column label="价格">
+          <template #default="{ row }">{{ row.stores[0] ? '¥' + row.stores[0].price : '—' }}</template>
+        </el-table-column>
+        <el-table-column label="库存">
+          <template #default="{ row }">{{ row.stores[0] ? row.stores[0].stock : '—' }}</template>
+        </el-table-column>
+        <el-table-column label="状态">
+          <template #default="{ row }">{{ row.stores[0] ? statusLabel(row.stores[0].status) : '本店没有' }}</template>
+        </el-table-column>
+        <el-table-column label="百科">
+          <template #default="{ row }">{{ externalText(row) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -82,7 +106,7 @@
 import { reactive, ref } from 'vue'
 import { api } from '../http'
 import { statusLabel } from '../format'
-import type { Book, ExternalBook } from '../types'
+import type { Book, CompareRow, ExternalBook } from '../types'
 
 const bookId = ref('')
 const status = ref('ON_SALE')
@@ -97,6 +121,8 @@ const content = reactive({ synopsis: '', contents: '', excerpt: '' })
 const query = ref('')
 const external = ref<ExternalBook | null>(null)
 const importing = reactive({ categoryId: '1', price: '', stock: '', status: 'OFF_SALE' })
+const compareText = ref('围城')
+const compared = ref<CompareRow[]>([])
 
 function fail(ex: unknown) {
   error.value = ex instanceof Error ? ex.message : '请求失败'
@@ -192,6 +218,35 @@ async function importBook() {
     })
     ok.value = '已引进'
   } catch (ex) {
+    fail(ex)
+  } finally {
+    busy.value = false
+  }
+}
+
+function storeText(row: CompareRow) {
+  if (!row.stores.length) return '本店没有'
+  const first = row.stores[0]
+  return row.stores.length > 1 ? `${first.title} 等 ${row.stores.length} 本` : first.title
+}
+
+function externalText(row: CompareRow) {
+  if (row.externalStatus === 'UNAVAILABLE') return '百科暂时不可用'
+  if (row.externalStatus === 'EMPTY' || !row.external) return '没有词条'
+  return row.external.synopsis || row.external.title
+}
+
+async function compareBooks() {
+  error.value = ''
+  ok.value = ''
+  busy.value = true
+  try {
+    const titles = compareText.value.split(/\n/).map((line) => line.trim()).filter(Boolean)
+    const data = await api<{ items: CompareRow[] }>('/api/admin/books/compare', { method: 'POST', body: { titles } })
+    compared.value = data.items
+    ok.value = '对照完成'
+  } catch (ex) {
+    compared.value = []
     fail(ex)
   } finally {
     busy.value = false

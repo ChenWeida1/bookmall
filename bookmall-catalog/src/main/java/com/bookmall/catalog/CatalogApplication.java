@@ -1,5 +1,8 @@
 package com.bookmall.catalog;
 
+import com.bookmall.catalog.config.BaikeProperties;
+import com.bookmall.catalog.config.CatalogCacheProperties;
+import com.bookmall.catalog.config.CompareProperties;
 import com.bookmall.common.auth.JwtAuthFilter;
 import com.bookmall.common.auth.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 
@@ -18,6 +22,7 @@ import org.springframework.context.annotation.Bean;
  * GET 目录与内部库存接口公开；{@code /api/admin/**} 需要管理员 JWT。
  */
 @SpringBootApplication(scanBasePackages = "com.bookmall")
+@EnableConfigurationProperties({CompareProperties.class, BaikeProperties.class, CatalogCacheProperties.class})
 public class CatalogApplication {
 
     /** 启动目录服务。 */

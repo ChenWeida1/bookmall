@@ -9,11 +9,13 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
+
 /**
  * 同步调用通知服务创建站内信。
  * <p>
  * 第一版不使用消息队列。通知失败不能让已经成功的订单回滚，因此异常只记日志。
- * 超时设为 1 秒，避免通知服务变慢拖住下单接口。
+ * 超时来自配置，默认 1 秒，避免通知服务变慢拖住下单接口。
  */
 @Component
 public class NotificationClient {
@@ -27,10 +29,13 @@ public class NotificationClient {
      * @param baseUrl      通知服务根地址，配置项 {@code bookmall.notification-base-url}
      * @param objectMapper 组装请求体
      */
-    public NotificationClient(@Value("${bookmall.notification-base-url}") String baseUrl, ObjectMapper objectMapper) {
+    public NotificationClient(
+            @Value("${bookmall.notification-base-url}") String baseUrl,
+            @Value("${bookmall.notification-timeout:1s}") Duration timeout,
+            ObjectMapper objectMapper) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(1000);
-        factory.setReadTimeout(1000);
+        factory.setConnectTimeout(timeout);
+        factory.setReadTimeout(timeout);
         this.client = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
         this.objectMapper = objectMapper;
     }

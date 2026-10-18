@@ -12,8 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -21,7 +21,7 @@ import java.util.Map;
  * 注册、登录和当前用户查询。
  * <p>
  * 用户名去掉首尾空白后长度为 3–20，且不能含空白字符。密码长度为 6–32，按原文校验，不裁剪。
- * 登录失败不区分用户名不存在和密码错误。令牌有效期 24 小时。
+ * 登录失败不区分用户名不存在和密码错误。令牌有效期来自配置，默认 24 小时。
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +35,9 @@ public class AuthService {
 
     /** 令牌签发。 */
     private final JwtService jwtService;
+
+    /** 令牌有效期。 */
+    private final Duration tokenTtl;
 
     /**
      * 注册新用户并立即签发令牌。
@@ -103,7 +106,7 @@ public class AuthService {
 
     /** 组装注册或登录成功后的令牌响应，过期时间截到秒。 */
     private Map<String, Object> tokenResponse(UserAccount account) {
-        Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS).truncatedTo(ChronoUnit.SECONDS);
+        Instant expiresAt = Instant.now().plus(tokenTtl).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
         Map<String, Object> body = new LinkedHashMap<>();
         short role = account.getRole() == null ? UserAccount.ROLE_READER : account.getRole();
         body.put("token", jwtService.create(account.getId(), account.getUsername(), role, expiresAt));

@@ -87,6 +87,22 @@ export interface ChatItem {
   createdAt: string
 }
 
+export interface CompareStore {
+  id: number
+  title: string
+  author: string
+  price: string
+  stock: number
+  status: string
+}
+
+export interface CompareRow {
+  query: string
+  stores: CompareStore[]
+  external: ExternalBook | null
+  externalStatus: 'OK' | 'EMPTY' | 'UNAVAILABLE'
+}
+
 export interface ExternalBook {
   lemmaId: number
   title: string

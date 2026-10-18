@@ -1,0 +1,16 @@
+# 发布到 Nacos：Data ID bookmall-catalog.yaml，Group DEFAULT_GROUP。
+# 图书服务用 optional 导入。没有这份配置时使用应用里的默认值。
+# 改完发布即可，不用重启。密钥、数据库密码和智谱密钥不要写在这里。
+bookmall:
+  baike:
+    app-id: "379020"
+    card-url: https://baike.baidu.com/api/openapi/BaikeLemmaCardApi
+    timeout: 3s
+    excerpt-length: 600
+  compare:
+    max-titles: 20
+    parallelism: 4
+    deadline: 20s
+    permit-wait: 15s
+  cache:
+    book-ttl: 60s

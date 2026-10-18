@@ -23,7 +23,6 @@ Kind 需 `kind load docker-image ...`。
 ```text
 kubectl apply -f deploy/k8s/namespace.yaml
 kubectl apply -f deploy/k8s/configmap-secret.yaml
-kubectl -n bookmall create configmap seata-config --from-file=application.yml=deploy/seata/application.yml
 kubectl apply -f deploy/k8s/infra.yaml
 # 等 Postgres Ready 后，按 docs/数据库设置.md 初始化（含 07-phase2-*.sql）
 kubectl apply -f deploy/k8s/apps.yaml

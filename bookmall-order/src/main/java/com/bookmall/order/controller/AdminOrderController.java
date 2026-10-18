@@ -50,7 +50,12 @@ public class AdminOrderController {
     }
 
     /**
-     * 处理最早的一条超时死信。请求体 {@code action} 为 replay 或 discard。
+     * 处理支付超时死信队列 {@code bookmall.order.pay.timeout.dlq} 里最早的一条。
+     * 请求体是 {@code {"action":"replay"}} 或 {@code {"action":"discard"}}。
+     * replay：发回交换机 {@code bookmall.order.pay}、路由键 {@code pay.timeout}，
+     * 直接进入超时队列，不再进延迟队列重等。消费者只在订单仍是待支付时取消并还库存。
+     * discard：确认掉这条消息，订单和库存都不动。
+     * 没传 action、action 不是这两个值，或队列是空的，返回 40001。
      */
     @PostMapping("/api/admin/orders/dead-letters")
     public ApiResponse<Map<String, Object>> deadLetterAction(HttpServletRequest request,

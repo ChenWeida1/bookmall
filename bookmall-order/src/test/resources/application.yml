@@ -12,9 +12,6 @@ spring:
     username: bookmall_order_app
     password: bookmall_order_dev
 
-seata:
-  enabled: false
-
 bookmall:
   jwt:
     secret: bookmall-dev-jwt-secret-key-32b!

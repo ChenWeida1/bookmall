@@ -30,6 +30,15 @@ bookmall:
     model: ${AI_MODEL:glm-4.7}
     temperature: 0.3
     max-tokens: 2048
+    connect-timeout: 5s
+    stream-timeout: 60s
+    chat-timeout: 30s
+    synopsis-max-tokens: 512
+  assistant:
+    history-messages: 20
+    max-question: 2000
+    max-stored: 16000
+    stream-timeout: 90s
 
 logging:
   pattern:

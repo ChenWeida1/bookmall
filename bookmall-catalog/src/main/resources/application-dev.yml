@@ -3,11 +3,17 @@ bookmall:
     secret: bookmall-dev-jwt-secret-key-32b!
 
 spring:
+  config:
+    import: optional:nacos:bookmall-catalog.yaml?refreshEnabled=true
   cloud:
     nacos:
       discovery:
         enabled: true
         server-addr: localhost:8848
+      config:
+        enabled: true
+        server-addr: localhost:8848
+        refresh-enabled: true
   data:
     redis:
       host: localhost

@@ -10,32 +10,30 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
-import java.time.Duration;
-
 /**
  * 按配置创建 LangChain4j 的流式模型。不使用会在启动时强制要密钥的自动配置。
  */
 @Configuration
-@EnableConfigurationProperties(LlmProperties.class)
+@EnableConfigurationProperties({LlmProperties.class, AssistantLimits.class})
 public class LlmConfiguration {
 
     /**
      * 指向智谱的 OpenAI 兼容地址。请求和响应都不打日志，避免密钥进入日志。
-     * 连接超时 5 秒，读取超时 60 秒。
+     * 连接和读取超时来自配置。
      */
     @Bean
     @Conditional(ApiKeyPresentCondition.class)
     StreamingChatModel streamingChatModel(LlmProperties properties) {
         JdkHttpClientBuilder http = new JdkHttpClientBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .readTimeout(Duration.ofSeconds(60));
+                .connectTimeout(properties.getConnectTimeout())
+                .readTimeout(properties.getStreamTimeout());
         return OpenAiStreamingChatModel.builder()
                 .baseUrl(properties.getBaseUrl())
                 .apiKey(properties.getApiKey())
                 .modelName(properties.getModel())
                 .temperature(properties.getTemperature())
                 .maxTokens(properties.getMaxTokens())
-                .timeout(Duration.ofSeconds(60))
+                .timeout(properties.getStreamTimeout())
                 .httpClientBuilder(http)
                 .logRequests(false)
                 .logResponses(false)
@@ -47,15 +45,15 @@ public class LlmConfiguration {
     @Conditional(ApiKeyPresentCondition.class)
     ChatModel chatModel(LlmProperties properties) {
         JdkHttpClientBuilder http = new JdkHttpClientBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .readTimeout(Duration.ofSeconds(30));
+                .connectTimeout(properties.getConnectTimeout())
+                .readTimeout(properties.getChatTimeout());
         return OpenAiChatModel.builder()
                 .baseUrl(properties.getBaseUrl())
                 .apiKey(properties.getApiKey())
                 .modelName(properties.getModel())
-                .temperature(0.3)
-                .maxTokens(512)
-                .timeout(Duration.ofSeconds(30))
+                .temperature(properties.getTemperature())
+                .maxTokens(properties.getSynopsisMaxTokens())
+                .timeout(properties.getChatTimeout())
                 .httpClientBuilder(http)
                 .logRequests(false)
                 .logResponses(false)
