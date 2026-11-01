@@ -1,15 +1,18 @@
 package com.bookmall.gateway;
 
 import com.bookmall.common.auth.JwtService;
+import com.bookmall.gateway.config.RateLimitProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 /**
  * 网关入口。前端只访问这里，由网关把 {@code /api} 转发到用户、目录、订单和通知服务。
  */
 @SpringBootApplication
+@EnableConfigurationProperties(RateLimitProperties.class)
 public class GatewayApplication {
 
     /** 启动网关。 */

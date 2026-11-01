@@ -1,5 +1,6 @@
 package com.bookmall.order.controller;
 
+import com.bookmall.order.sentinel.SentinelCalls;
 import com.bookmall.order.service.CartService;
 import com.bookmall.order.service.OrderService;
 import com.bookmall.common.api.ApiResponse;
@@ -92,7 +93,8 @@ public class OrderController {
      */
     @PostMapping("/api/orders")
     public ApiResponse<Map<String, Object>> create(HttpServletRequest request, @RequestBody(required = false) JsonNode body) {
-        return ApiResponse.ok(orderService.create(JwtAuthFilter.userId(request), body));
+        long userId = JwtAuthFilter.userId(request);
+        return ApiResponse.ok(SentinelCalls.guard(SentinelCalls.ORDER_CREATE, () -> orderService.create(userId, body)));
     }
 
     /**

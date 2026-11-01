@@ -1,0 +1,8 @@
+[
+  {
+    "resource": "order-create",
+    "grade": 1,
+    "count": 5,
+    "controlBehavior": 0
+  }
+]

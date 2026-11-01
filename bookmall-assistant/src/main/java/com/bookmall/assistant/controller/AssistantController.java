@@ -1,5 +1,6 @@
 package com.bookmall.assistant.controller;
 
+import com.bookmall.assistant.sentinel.SentinelCalls;
 import com.bookmall.assistant.service.AssistantService;
 import com.bookmall.assistant.service.SynopsisService;
 import com.bookmall.common.api.ApiResponse;
@@ -44,7 +45,8 @@ public class AssistantController {
      */
     @PostMapping(value = "/api/assistant/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter ask(HttpServletRequest request, @RequestBody(required = false) JsonNode body) {
-        return assistantService.ask(JwtAuthFilter.userId(request), body);
+        long userId = JwtAuthFilter.userId(request);
+        return SentinelCalls.guard(SentinelCalls.ASSISTANT_ASK, () -> assistantService.ask(userId, body));
     }
 
     /** 管理端生成梗概。没密钥时 50301。 */

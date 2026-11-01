@@ -1,0 +1,9 @@
+[
+  {
+    "resource": "GET:/api/books",
+    "grade": 1,
+    "count": 20,
+    "controlBehavior": 2,
+    "maxQueueingTimeMs": 500
+  }
+]

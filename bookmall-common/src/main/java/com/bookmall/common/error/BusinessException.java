@@ -84,4 +84,11 @@ public class BusinessException extends RuntimeException {
     public static BusinessException forbidden(String message) {
         return new BusinessException(403, 40300, message);
     }
+
+    /**
+     * 请求过于频繁，错误码 42901。
+     */
+    public static BusinessException tooManyRequests() {
+        return new BusinessException(429, 42901, "请求过于频繁");
+    }
 }

@@ -74,6 +74,8 @@ public class AssistantService {
 
     /**
      * 发起一次流式提问。未配置密钥时抛出 50301，不落库。
+     * <p>
+     * 流控在控制器入口完成，确保过载时不进入本方法、不写出 SSE。
      */
     public SseEmitter ask(long userId, JsonNode body) {
         if (!llm.configured() || models.getIfAvailable() == null) {

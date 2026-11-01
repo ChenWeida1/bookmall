@@ -12,6 +12,11 @@ spring:
         enabled: false
       config:
         enabled: false
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ""
   datasource:
     hikari:
       connection-init-sql: SET TIME ZONE 'UTC'
